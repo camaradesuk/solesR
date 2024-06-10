@@ -28,7 +28,7 @@ We want to aknowledge the software that has made our work here possible, includi
 - AutoAnnotation: https://github.com/camaradesuk/AutoAnnotation 
 - ASySD: https://github.com/camaradesuk/ASySD - [paper](https://bmcbiol.biomedcentral.com/articles/10.1186/s12915-023-01686-z)
 - rcrossref: https://github.com/ropensci/rcrossref
-- roaddoi: https://github.com/ropensci/roadoi
+- roadoi: https://github.com/ropensci/roadoi
 - ScopusAPI: https://github.com/christopherBelter/scopusAPI
 - rwos: https://github.com/juba/rwos
 - RISMed: https://github.com/kaitlynhair/RISmed
