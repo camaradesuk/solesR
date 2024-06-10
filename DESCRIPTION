@@ -1,0 +1,83 @@
+Package: solesR
+Title: Systematic Online Living Evidence Summaries in R
+Version: 0.1.1
+Authors@R: c(
+    person("Kaitlyn", "Hair", , "kaitlyn.hair@ed.ac.uk", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0003-0180-7343")),
+    person("Sean", "Smith", , "ssmith49@ed.ac.uk", role = "aut"),
+    person("Maria", "Economou", , "maria.economou@bih-charite.de", role = "aut"),
+    person("Emma", "Wilson", , "emma.wilson@ed.ac.uk", role = "aut",
+           comment = c(ORCID = "0000-0002-8100-7508")),
+    person("Alexandra", "Bannach-Brown", ,"alexandra.bannach-brown@charite.de", role = "aut",
+           comment = c(ORCID = "0000-0002-3161-1395"))
+    )
+Description: R functions to support Systematic Online Living Evidence Summaries.
+License: AGPL (>= 3)
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.2.3
+Suggests:
+    ggplot2,
+    knitr,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Imports: 
+    RefManageR,
+    crayon,
+    data.table,
+    janitor,
+    fst,
+    RISmed,
+    lubridate,
+    rwos,
+    scopusAPI,
+    magrittr,
+    rcrossref,
+    fuzzyjoin,
+    XML,
+    openalexR,
+    purrr,
+    openxlsx,
+    viridis,
+    DT,
+    DBI,
+    shinyFeedback,
+    shinyjs,
+    foreach,
+    oddpub,
+    ASySD,
+    AutoAnnotation,
+    doParallel,
+    parallel,
+    parallelly,
+    pdftools,
+    osfr,
+    qdapRegex,
+    readxl,
+    readr,
+    reticulate,
+    roadoi,
+    stringdist,
+    stringi,
+    stringr,
+    tibble,
+    tokenizers,
+    synthesisr,
+    rlang,
+    rwoslite (>= 0.0.1),
+    tidyr,
+    plyr,
+    dplyr,
+    dbplyr
+VignetteBuilder: knitr
+Remotes:  
+    kaitlynhair/RISmed,
+    kaitlynhair/rwos,
+    kaitlynhair/scopusAPI,
+    camaradesuk/ASySD,
+    camaradesuk/AutoAnnotation,
+    quest-bih/oddpub,
+    frbcesab/rwoslite
+Depends: 
+    R (>= 2.10),
+    bibliometrix
