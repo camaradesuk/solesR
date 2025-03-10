@@ -11,6 +11,7 @@ This is our open source R package for the development of Systematic Online Livin
 - working with data from SyRF
 
 Read more about SOLES from our [publication in 2023](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10220429/) 
+Find out more about the different [SOLES platforms](https://camaradesuk.github.io/soles-projects/)
 
 # Installation
 
@@ -19,6 +20,8 @@ library(devtools)
 install_github("camaradesuk/solesR")
 library(solesR)
 ```
+
+Refer to Wiki pages for detailed guidance on how to set up a SOLES project
 
 # Packages and libraries used by solesR
 We want to aknowledge the software that has made our work here possible, including: 
