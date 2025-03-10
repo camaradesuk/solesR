@@ -10,9 +10,7 @@ This is our open source R package for the development of Systematic Online Livin
 - assessing code / data sharing
 - working with data from SyRF
 
-Read more about SOLES from our [publication in 2023](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10220429/) 
-
-Find out more about the different [SOLES platforms](https://camaradesuk.github.io/soles-projects/)
+Read more about SOLES from our [publication in 2023](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10220429/) and find out more about the different [SOLES platforms](https://camaradesuk.github.io/soles-projects/)
 
 # Installation
 
