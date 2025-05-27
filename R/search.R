@@ -282,21 +282,36 @@ check_if_retrieved <- function(con, citations){
 #' @export
 manual_upload <- function(paths, source){
   
-    if(source == "xml"){
+  if(source == "xml"){
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_xml, mc.cores = parallelly::availableCores())
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_xml, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_xml)
+    }  
     
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
     
     return(combined_data)
   }
+  
+  else if(source == "wos"){
     
-    else if(source == "wos"){
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_wos, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_wos)
+    }  
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_wos, mc.cores = parallelly::availableCores())
     
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
@@ -305,8 +320,15 @@ manual_upload <- function(paths, source){
     
   } else if(source == "pubmed"){
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_pubmed, mc.cores = parallelly::availableCores())
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_pubmed, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_pubmed)
+    }  
     
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
@@ -315,8 +337,15 @@ manual_upload <- function(paths, source){
     
   }  else if(source == "embase"){
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_embase, mc.cores = parallelly::availableCores())
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_embase, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_embase)
+    }  
     
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
@@ -325,9 +354,15 @@ manual_upload <- function(paths, source){
     
   }  else if(source == "psychinfo"){
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_psychinfo, mc.cores = parallelly::availableCores())
-    
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_psychinfo, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_psychinfo)
+    }  
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
     combined_data$uid <- tolower(combined_data$uid)
@@ -335,8 +370,15 @@ manual_upload <- function(paths, source){
     
   }  else if(source == "medline"){
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_medline, mc.cores = parallelly::availableCores())
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_medline, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_medline)
+    }  
     
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
@@ -345,8 +387,16 @@ manual_upload <- function(paths, source){
     
   } else if(source == "scopus"){
     
-    # Run in parallel for each path
-    processed_data <- parallel::mclapply(paths, process_scopus, mc.cores = parallelly::availableCores())
+    
+    if (.Platform$OS.type == "unix") {
+      
+      # Run in parallel for each path
+      processed_data <- parallel::mclapply(paths, process_scopus, mc.cores = parallelly::availableCores())
+    } else {
+      
+      # Run for each path (not in parallel)
+      processed_data <- lapply(paths, process_scopus)
+    }  
     
     # Combine the results into one list
     combined_data <- do.call(rbind, processed_data)
@@ -531,8 +581,6 @@ process_psychinfo <- function(path){
     newdat <- newdat %>%
       mutate(article_id = NA)
   }
-  
-  print(newdat$article_id)
   
   newdat <- newdat %>%
     mutate(pmid = "") %>%
@@ -939,36 +987,35 @@ process_xml <- function(path){
                        accession = sapply(x, xpath2, ".//accession-num", xmlValue),
                        url = sapply(x, xpath2, ".//url", xmlValue))
   
-    pattern <- "eid=(2-s2\\.0-\\d+)"
-    
-    newdat <- newdat %>%
-      mutate(source = case_when(
-        grepl("scopus", url, ignore.case = TRUE) ~ "scopus",
-        grepl("Embase", database, ignore.case = TRUE) ~ "embase",
-        grepl("pubmed", database, ignore.case = TRUE) ~ "pubmed",
-        grepl("BIOSIS", url, ignore.case = TRUE) ~ "biosis",
-        grepl("BCI:", url, ignore.case = TRUE) ~ "biosis",
-        grepl("wos", accession, ignore.case = TRUE) ~ "wos",
-        grepl("medline", database, ignore.case = TRUE) ~ "medline",
-        TRUE ~ "unknown"  # Keep the original source if none of the conditions match
-      )) %>%
-      ungroup()
-    
-    newdat <- newdat %>%
-      rowwise() %>%
-      mutate(accession = ifelse(source %in% "scopus", regmatches(url, regexpr(pattern, url)), accession)) %>%
-      ungroup() %>%
-      mutate(accession = ifelse(is.na(accession), paste0("noid:", 1000 + row_number()), accession)) %>%
-      mutate(accession = gsub("eid=", "", accession)) %>%
-      mutate(accession = gsub("WOS:", "", accession)) %>%
-      mutate(uid = paste0(source, "-", accession)) %>%
-      mutate(uid = gsub("unknown-noid:", "unknown-", uid))  
+  pattern <- "eid=(2-s2\\.0-\\d+)"
   
-
+  newdat <- newdat %>%
+    mutate(source = case_when(
+      grepl("scopus", url, ignore.case = TRUE) ~ "scopus",
+      grepl("Embase", database, ignore.case = TRUE) ~ "embase",
+      grepl("pubmed", database, ignore.case = TRUE) ~ "pubmed",
+      grepl("BIOSIS", url, ignore.case = TRUE) ~ "biosis",
+      grepl("BCI:", url, ignore.case = TRUE) ~ "biosis",
+      grepl("wos", accession, ignore.case = TRUE) ~ "wos",
+      grepl("medline", database, ignore.case = TRUE) ~ "medline",
+      TRUE ~ "unknown"  # Keep the original source if none of the conditions match
+    )) %>%
+    ungroup()
+  
+  newdat <- newdat %>%
+    rowwise() %>%
+    mutate(accession = ifelse(source %in% "scopus", regmatches(url, regexpr(pattern, url)), accession)) %>%
+    ungroup() %>%
+    mutate(accession = ifelse(is.na(accession), paste0("noid:", 1000 + row_number()), accession)) %>%
+    mutate(accession = gsub("eid=", "", accession)) %>%
+    mutate(accession = gsub("WOS:", "", accession)) %>%
+    mutate(uid = paste0(source, "-", accession)) %>%
+    mutate(uid = gsub("unknown-noid:", "unknown-", uid))  
+  
+  
   format_cols(newdat)
   format_doi(newdat)
   
   return(newdat)
 }
-
 
