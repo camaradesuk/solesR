@@ -12,7 +12,7 @@ Authors@R: c(
            comment = c(ORCID = "0000-0002-3161-1395"))
     )
 Description: R functions to support Systematic Online Living Evidence Summaries.
-License: AGPL (>= 3)
+License: AGPL (>= 3) + file LICENSE
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.2.3
