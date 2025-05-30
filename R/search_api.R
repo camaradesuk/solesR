@@ -1,7 +1,9 @@
 #' Search Scopus and retrieve bibliographic data using scopusAPI
 #'
 #' @description
-#' A wrapper function for scopusAPI. Search Scopus using a query and retrieve results programmatically. Requires an API key from Scopus (http://dev.elsevier.com/).
+#' A wrapper function for scopusAPI. Search Scopus using a query and retrieve results programmatically. 
+#' Requires `devtools::install_github(kaitlynhair/scopusAPI)`.
+#' Requires an API key from Scopus (http://dev.elsevier.com/).
 #' Use the function `usethis::edit_r_environ()` to add the key to your ~/.Renviron file.
 #'
 #' @param query a character string containing a correctly syntaxed Scopus search 
@@ -9,12 +11,12 @@
 #' @param retMax The maximum number of records to retrieve, default is 2000, maximum is 5000
 #' @param format_soles boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE
 #' @return a dataframe containing Scopus search results
-#' @example 
-#' \dontrun
+#' @examples
+#' \dontrun{
 #' # api_key should be stored in your r environment and not shared
 #' query <- "TITLE-ABS-KEY(dementia OR \"memory loss\")"
-#' scopus_result <- scopus_search(query, api_key, retMax = 500, format_soles = FALSE)
-#' \dontrun
+#' scopus_result <- scopus_search(query, api_key = api_key, retMax = 500, format_soles = FALSE)
+#' }
 #' @import dplyr
 #' @import scopusAPI
 #' @export
@@ -53,12 +55,9 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax=2000, format_sole
   scopus_results <- tryCatch(
     {
       # Try getting results
-      result <- scopusAPI::search_scopus(string = query,
+      scopus_results <- scopusAPI::search_scopus(string = query,
                                          api_key = api_key,
                                          retMax = retMax)
-      # Return results if successful
-      message("Retrieved ", nrow(result), "records from Scopus")
-      return(result)
     },
     error = function(e) {
       # Print error message and exit if error occurred
@@ -66,26 +65,19 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax=2000, format_sole
     }
   )
   
+  # Return results if successful
+  message("Retrieved ", nrow(scopus_results), "records from Scopus")
+  
   # Format for SOLES workflow if format_soles == TRUE
-  if (format_SOLES == TRUE) {
+  if (format_soles == TRUE) {
     # Print message
     message("Formatting records for SOLES...")
     # Rename and create columns for SOLES
     scopus_results <- scopus_results %>%
-      # Rename columns
-      dplyr::rename(author = authors,
-                    author_affiliation = affiliations,
-                    author_country = countries,
-                    title = articletitle) %>%
-      dplyr::mutate(source = "scopus",
-                    # Create unique identifier
-                    uid = paste0(source, "-", scopusID),
-                    # Format author column
-                    author = gsub("\\|", ";", author),
-                    # Format search date as character in format DDMMYY
-                    date = format(Sys.Date(), "d%m%y%")) %>%
+      # Format search date as character in format DDMMYY
+      dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
-      dplyr::filter(!is.na(scopusID))
+      dplyr::filter(!is.na(.data$scopusID))
   }
   
   # Change all "NA" to real NA
@@ -113,12 +105,12 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax=2000, format_sole
 #' @param timespan a formatted character string defining the timespan you want to search
 #' @param format_soles boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE
 #' @return a dataframe containing Web of Science search results
-#' @example 
-#' \dontrun
+#' @examples 
+#' \dontrun{
 #' # api_key should be stored in your r environment and not shared
 #' query <- "TS=(dementia OR \"memory loss\")"
 #' wos_result <- wos_search(query, timespan = "1week", format_soles = FALSE)
-#' \dontrun
+#' }
 #' @import dplyr
 #' @import rwoslite
 #' 
@@ -181,8 +173,6 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE){
     {
       # Check number of records
       n_records <- rwoslite::wos_search(full_query, database)
-      # Return results if successful
-      return(n_records)
     },
     error = function(e) {
       # Print error message and exit if error occurred
@@ -199,11 +189,7 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE){
   wos_results <- tryCatch(
     {
       # Try getting results
-      result <- rwoslite::wos_get_records(full_query)
-      
-      # Return results if successful
-      message("Retrieved ", nrow(result), "records from Web of Science Core Collection")
-      return(result)
+      wos_results <- rwoslite::wos_get_records(full_query)
     },
     error = function(e) {
       # Print error message and exit if error occurred
@@ -211,31 +197,34 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE){
     }
   )
   
+  # Return results if successful
+  message("Retrieved ", nrow(wos_results), " records from Web of Science Core Collection")
+  
   # Format for SOLES workflow if format_soles == TRUE
-  if (format_SOLES == TRUE){
+  if (format_soles == TRUE){
     # Print message
     message("Formatting records for SOLES...")
     # Rename and create columns for SOLES
     wos_results <- wos_results %>%
       # Rename columns
-      dplyr::rename(author = authors,
-                    journal = source,
-                    year = published_year) %>%
-      dplyr::mutate(source = "scopus",
+      dplyr::rename(author = .data$authors,
+                    journal = .data$source,
+                    year = .data$published_year) %>%
+      dplyr::mutate(source = "wos",
                     # Create unique identifier
-                    uid = tolower(ut),
+                    uid = tolower(.data$ut),
                     # Format author column
-                    author = gsub('[[:space:]]\\|[[:space:]]', '; ', author),
+                    author = gsub('[[:space:]]\\|[[:space:]]', '; ', .data$author),
                     # Format journal column
-                    journal = tolower(journal),
-                    journal = tools::toTitleCase(journal),
-                    journal = as.character(journal),
+                    journal = tolower(.data$journal),
+                    journal = tools::toTitleCase(.data$journal),
+                    journal = as.character(.data$journal),
                     # Add empty abstract column
                     abstract = NA,
                     # Format search date as character in format DDMMYY
-                    date = format(Sys.Date(), "d%m%y%")) %>%
+                    date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
-      dplyr::filter(!is.na(scopusID))
+      dplyr::filter(!is.na(.data$ut))
       
   }
   
@@ -245,7 +234,7 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE){
   wos_results[wos_results == "" ] <- NA
   
   # Make DOI lowercase
-  scopus_results$doi <- tolower(scopus_results$doi)
+  wos_results$doi <- tolower(wos_results$doi)
   
   # Return search results
   return(wos_results)	
@@ -258,19 +247,17 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE){
 #' A wrapper function for RISmed. Search PubMed using a query and retrieve results programmatically.
 #' The timespan should be formatted as a number followed by the word "week" or "month", e.g. "1month" or "2week".
 #' One week is calculated as 7 days and one month is calculated as 31 days.
-#' Currently both SOLES_format - TRUE and FALSE give the same SOLES compatible format.
 #'
 #' @param query a character string containing a correctly syntaxed PubMed search
 #' @param timespan a formatted character string defining the timespan you want to search
 #' @param retMax The maximum number of records to retrieve, default is 5000, maximum is 5000
 #' @param format_soles boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE
 #' @return a dataframe containing Web of Science search results
-#' @example 
-#' \dontrun
-#' # api_key should be stored in your r environment and not shared
+#' @examples 
+#' \dontrun{
 #' query <- "(dementia[tiab] OR \"memory loss\"[tiab])"
 #' pubmed_result <- pubmed_search(query, timespan = "1week", format_soles = FALSE)
-#' \dontrun
+#' }
 #' @import dplyr
 #' @import RISmed
 #' 
@@ -291,11 +278,6 @@ pubmed_search <- function(query, timespan, retMax=5000, format_soles = TRUE){
   # Check format_soles is boolean and exit if not
   if(is.logical(format_soles) == FALSE){
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
-  }
-  
-  # Check if format_soles is FALSE, currently only SOLES format is supported
-  if(format_soles == FALSE){
-    stop(message("Error: currently only SOLES compatible formatting is available"))
   }
   
   # Check if retMax is a positive integer and exit if not
@@ -336,35 +318,22 @@ pubmed_search <- function(query, timespan, retMax=5000, format_soles = TRUE){
   # Print message
   message("Running PubMed search...")
   
-  # Try getting summary of NCBI EUtils query
-  pubmed_search <- tryCatch(
-    {
-      # Try getting results
-      search <- RISmed::EUtilsSummary(query, 
-                                      retmax=retMax,
-                                      mindate = paste0(format(min_date_char, "%Y/%m/%d")),
-                                      maxdate=paste0(format(max_date_char, "%Y/%m/%d")),
-                                      type="esearch", 
-                                      db="pubmed")
-      # Get summary
-      summary <- RISmed::summary(search)
-      
-      # Return results if successful
-      return(search)
-    },
-    error = function(e) {
-      # Print error message and exit if error occurred
-      stop("Error in calling RISmed::EUtilsSummary()", conditionMessage(e))
-    }
-  )
+  # Get summary of NCBI EUtils query
+  pubmed_search <- RISmed::EUtilsSummary(query, 
+                                         retmax=retMax,
+                                         mindate = paste0(format(min_date_char, "%Y/%m/%d")),
+                                         maxdate=paste0(format(max_date_char, "%Y/%m/%d")),
+                                         type="esearch", 
+                                         db="pubmed")
+  
+  # Get summary
+  summary <- RISmed::summary(pubmed_search)
   
   # Try running search query using RISmed R package
   records <- tryCatch(
     {
       # Try getting results
-      result <- RISmed::EUtilsGet(pubmed_search)
-      # Return results as Medline object if successful
-      return(result)
+      records <- RISmed::EUtilsGet(pubmed_search)
     },
     error = function(e) {
       # Print error message and exit if error occurred
@@ -451,14 +420,14 @@ pubmed_search <- function(query, timespan, retMax=5000, format_soles = TRUE){
       dplyr::mutate_if(is.factor, as.character) %>%
       # reate URL column
       dplyr::mutate(url = paste0("https://www.ncbi.nlm.nih.gov/pubmed/",
-                                 pmid),
+                                 .data$pmid),
                     source = "pubmed",
                     # reate unique identifier
-                    uid = paste0(source, "-", pmid),
+                    uid = paste0(.data$source, "-", .data$pmid),
                     # Format search date as character in format DDMMYY
-                    date = format(Sys.Date(), "d%m%y%")) %>%
+                    date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
-      dplyr::filter(!is.na(pmid))
+      dplyr::filter(!is.na(.data$pmid))
   }
   
   # Change all "NA" to real NA
@@ -467,10 +436,10 @@ pubmed_search <- function(query, timespan, retMax=5000, format_soles = TRUE){
   pubmed_results[pubmed_results == "" ] <- NA
   
   # Make DOI lowercase
-  scopus_results$doi <- tolower(scopus_results$doi)
+  pubmed_results$doi <- tolower(pubmed_results$doi)
   
   # Print number of records retrieved
-  message("Retrieved ", nrow(pubmed_results), "records from PubMed")
+  message("\nRetrieved ", nrow(pubmed_results), " records from PubMed")
   
   # Return results
   return(pubmed_results)
