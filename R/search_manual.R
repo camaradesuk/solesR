@@ -1,201 +1,124 @@
-#' Load Citations from Manual Source (WoS, PubMed, Embase)
+#' Import Search Results from Manual Searches of Bibliographic Databases
 #'
-#' This function loads citations from a specified source (WoS, PubMed, or Embase), 
-#' processes the data, and returns a dataframe of the citations with standardized 
-#' formatting.
+#' Read search results manually downloaded from bibliographic databases into R for use in SOLES workflows.
+#' Columns are formatted for SOLES integration.
+#' 
+#' Data can be imported from Ovid databases (Scopus, Embase, PsychINFO, or MEDLINE) in `.bib`, `.ris`, and `.txt` format;
+#' Web of Science in `.bib` or `.ris` format; and PubMed in `.bib` format.
+#' Additionally, data from EndNote can be imported via EndNote XML file. No other XML file formats are permitted.
+#' 
 #'
 #' @import RefManageR
 #' @import dplyr
 #' @import parallel
 #' @import bibliometrix
 #' @importFrom utils read.csv read.table
-#' @param paths A character vector of file paths to the citations files.
-#' @param source The source database for the citations (choices: "wos", "pubmed", "embase").
+#' @param paths a character vector of file paths to the manual search result files
+#' @param source the source database for the search results. Choices: "scopus", "embase", "psychinfo", "medline", "wos", "pubmed", or "endnote")
 #'
-#' @return A list of dataframes, each containing the citations from the specified source.
+#' @return a dataframe containing the search results from the specified source, formatted for SOLES
 #'
 #' @export
 manual_upload <- function(paths, source){
   
-  if(source == "xml"){
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_xml, mc.cores = parallelly::availableCores())
-    } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_xml)
-    }  
-    
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    
-    return(combined_data)
+  # List all supported database sources
+  sources <- c("scopus", "embase", "psychinfo", "medline", "wos", "pubmed", "endnote")
+  
+  # List the corresponding function names to process data from each source
+  manual_process_functions <- list(
+    scopus = process_scopus,
+    embase = process_embase,
+    psychinfo = process_psychinfo,
+    medline = process_medline,
+    wos = process_wos,
+    pubmed = process_pubmed,
+    endnote = process_endnote
+  )
+  
+  # Check if source is supported
+  if (!(source %in% sources)) {
+    stop(message("Error: source type not supported. Supported options are: 'scopus', 'embase', 'psychinfo', 'medline', 'wos', 'pubmed' or 'endnote'."))
   }
   
-  else if(source == "wos"){
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_wos, mc.cores = parallelly::availableCores())
+  # Define function to handle manual file processing logic
+  process_manual_upload <- function(process_function) {
+    # Check operating system and apply function
+    if (.Platform$OS.type == "Unix") {
+      # Run in parallel for Unix OS
+      processed_results <- parallel::mclapply(paths, 
+                                              process_function,
+                                              mc.cores = parallelly::availableCores())
     } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_wos)
-    }  
+      # Run sequentially for other OS
+      processed_results <- lapply(paths, process_function)
+    }
     
-    
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    
-    return(combined_data)
-    
-  } else if(source == "pubmed"){
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_pubmed, mc.cores = parallelly::availableCores())
-    } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_pubmed)
-    }  
-    
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    
-    return(combined_data)
-    
-  }  else if(source == "embase"){
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_embase, mc.cores = parallelly::availableCores())
-    } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_embase)
-    }  
-    
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    combined_data$uid <- tolower(combined_data$uid)
-    return(combined_data)
-    
-  }  else if(source == "psychinfo"){
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_psychinfo, mc.cores = parallelly::availableCores())
-    } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_psychinfo)
-    }  
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    combined_data$uid <- tolower(combined_data$uid)
-    return(combined_data)
-    
-  }  else if(source == "medline"){
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_medline, mc.cores = parallelly::availableCores())
-    } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_medline)
-    }  
-    
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    
-    return(combined_data)
-    
-  } else if(source == "scopus"){
-    
-    
-    if (.Platform$OS.type == "unix") {
-      
-      # Run in parallel for each path
-      processed_data <- parallel::mclapply(paths, process_scopus, mc.cores = parallelly::availableCores())
-    } else {
-      
-      # Run for each path (not in parallel)
-      processed_data <- lapply(paths, process_scopus)
-    }  
-    
-    # Combine the results into one list
-    combined_data <- do.call(rbind, processed_data)
-    
-    return(combined_data)
-    
-  }  else {
-    
-    message("input type not currently supported")
-    return()
-  }}
+    # Combine results into one dataframe
+    do.call(rbind, processed_results)
+  }
+  
+  # Call the processing function based on the data source
+  combined_data <- process_manual_upload(manual_process_functions[[source]])
+  
+  }
 
-
-
-#' Format Columns for SOLES Search Data
+#' Format Manual Upload Search Data Columns for SOLES
 #'
-#' This function processes a dataframe to retain relevant columns required for SOLES and standardizes the case of 
-#' specific columns to ensure consistent formatting.
+#' Internal function used to process manual uploads used to format columns so they can be combined in SOLES workflows.
 #'
 #' @import dplyr
 #'
-#' @param df A dataframe to be formatted for SOLES search data.
+#' @param df a manual upload file dataframe to be correctly formatted for SOLES
 #'
-#' @return A formatted dataframe containing the required SOLES columns with standardized case.
+#' @return a formatted dataframe containing the required SOLES columns with standardized case
 #' 
 format_cols <- function(df){
   
-  # cols required for soles
+  # Create vector with columns required for SOLES
   x <- c("uid", "author", "year", "journal", "doi", "title",
          "pages", "volume", "abstract", "isbn", "keywords",
          "secondarytitle", "url", "date", "issn", "pmid", "ptype", 
          "source", "author_country", "number", "author_affiliation")
   
+  # Subset columns that require title case
   title_case_cols <- c("author","journal", "secondarytitle", "author_country", "author_affiliation")
   
-  sentence_case_cols <- c("title",
-                          "abstract")
-  
+  # Subset columnns that require lower case
   lower_case_cols <- c("uid", "doi",  "keywords", "ptype", 
                        "source")
   
+  # If the column does not exist in upload file, fill in missing data with NA
   df[x[!(x %in% colnames(df))]] = NA
+  
+  # Format correct letter case
   df <- df %>%
     select(all_of(x)) %>%
-    mutate(across(all_of(sentence_case_cols), ~stringr::str_to_sentence(.))) %>%
     mutate(across(all_of(lower_case_cols), ~stringr::str_to_lower(.))) %>%
     mutate(across(all_of(title_case_cols), ~stringr::str_to_title(.))) %>%
+    # Add additional space after semi-colon
     mutate_at(vars(x), ~ gsub(";", "; ", .))
   
+  # Replace double hyphens with single hyphen in pages column
   df$pages <- lapply(df$pages, function(x) gsub("--", "-", x))
-  df$date  <-  format(Sys.Date(), "%d%m%y")
   
+  # Set date as today's date
+  df$date <-format(Sys.Date(), "%d%m%y")
+  
+  # Remove additional line breaks and carriage returns
   cols_to_modify <-  c('title', 'year', 'journal', 'abstract', 'doi', 'number', 'pages', 'volume', 'isbn', 'issn')
   df[cols_to_modify] <- lapply(df[cols_to_modify], function(x) gsub("\\r\\n|\\r|\\n", "", x))
+  
+  # Return correctly formatted dataframe
   return(df)
 }
 
-#' Process Embase references
+#' Process Manually Uploaded Search results from Embase
 #'
-#' This function processes references from Embase.
+#' Internal function used to process Embase search results an format for SOLES.
 #'
-#' @param path The file path of the data.
+#' @param path the file path to the search results
 #'
-#' @return A processed data frame.
+#' @return a processed dataframe containing search results
 #'
 #' @details
 #' This function reads references from the specified file using the "ovid" tag naming convention. 
@@ -214,59 +137,78 @@ format_cols <- function(df){
 #' @import dplyr
 process_embase <- function(path){
   
+  # Extract file extension
+  file_extension <- tools::file_ext(path)
+  
+  # Check file extension
+  if (!file_extension %in% c("ris", "bib", "txt")) {
+    stop(message("Error: File type not supported"))
+  }
+  
+  # Read in data using synthesisr package
   newdat <- synthesisr::read_refs(path, tag_naming = "ovid")
   
+  # Rename columns for SOLES
   newdat$number <- newdat$issue
   newdat$author_affiliation <- newdat$address
   
+  # If book, add booktitle to title column
   if("booktitle" %in% colnames(newdat)) {
     newdat <-newdat %>%
-      tidyr::unite(title, booktitle, na.rm = TRUE)
+      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
   }
   
+  # If has both start and end page, combine into one column
   if("start_page" %in% colnames(newdat) &
      "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(pages, start_page, end_page, sep="-", na.rm=TRUE)
+      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep="-", na.rm=TRUE)
   } else{
-    
+    # Else take start page only
     newdat <- newdat %>%
-      mutate(pages = start_page)
+      mutate(pages = .data$start_page)
   }
   
+  # Set date as today
   newdat$date  <-  format(Sys.Date(), "%d%m%y")
   
+  # If no article identifer column, set as NA
   if (!"article_id" %in% colnames(newdat)) {
     newdat <- newdat %>%
       mutate(article_id = NA)
   }
   
-  # print(newdat$article_id)
-  
+  # Create unique article identifier for each record
   newdat <- newdat %>%
-    mutate(pmid = ifelse(!is.na(article_id), gsub("\\[.*", "", article_id), "")) %>%
-    mutate(uid = paste0("embase-", AN)) 
+    mutate(pmid = ifelse(!is.na(.data$article_id), gsub("\\[.*", "", .data$article_id), "")) %>%
+    mutate(uid = paste0("embase-", .data$AN)) 
   
+  # If publication type column exists, rename it for SOLES
   if("PT" %in% colnames(newdat)) {
     newdat$ptype <- newdat$PT
   }
   
+  # Set source as embase
   newdat$source <- "embase"
   
+  # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
+  
+  # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
   
+  # Return formatted dataframe
   return(newdat)
 }
 
 
-#' Process PsychInfo references
+#' Process Manually Uploaded Search results from PsychINFO
 #'
-#' This function processes references from PsychInfo.
+#' Internal function used to process PsychINFO search results an format for SOLES.
 #'
-#' @param path The file path of the data.
+#' @param path the file path to the search results
 #'
-#' @return A processed data frame.
+#' @return a processed dataframe containing search results
 #'
 #' @details
 #' This function reads references from the specified file using the "ovid" tag naming convention. 
@@ -285,57 +227,78 @@ process_embase <- function(path){
 #' @import dplyr
 process_psychinfo <- function(path){
   
+  # Extract file extension
+  file_extension <- tools::file_ext(path)
+  
+  # Check file extension
+  if (!file_extension %in% c("ris", "bib", "txt")) {
+    stop(message("Error: File type not supported"))
+  }
+  
+  # Read in data using synthesir package
   newdat <- synthesisr::read_refs(path, tag_naming = "ovid")
   
+  # Rename columns for SOLES
   newdat$number <- newdat$issue
   newdat$ptype <- newdat$PT
   newdat$url <- newdat$L2
   newdat$author_affiliation <- newdat$M2
   
+  # If book, use booktitle as title
   if("booktitle" %in% colnames(newdat)) {
     newdat <-newdat %>%
-      tidyr::unite(title, booktitle, na.rm = TRUE)
+      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
   }
   
-  else if("start_page" %in% colnames(newdat) &
+  # If has both start and end page, combine into one column
+  if("start_page" %in% colnames(newdat) &
           "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(pages, start_page, end_page, sep="-", na.rm=TRUE)
-  } else{
-    
+      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep="-", na.rm=TRUE)
+  } else {
+    # Else take start page only
     newdat <- newdat %>%
-      mutate(pages = start_page)
+      mutate(pages = .data$start_page)
   }
   
+  # If no pages given, set as NA
   newdat <- newdat %>%
-    mutate(pages = ifelse(pages == "No-Specified", NA_character_, paste(pages)))
+    mutate(pages = ifelse(.data$pages == "No-Specified", NA_character_, paste(.data$pages)))
   
+  # Set date as tday
   newdat$date  <-  format(Sys.Date(), "%d%m%y")
   
+  # If no article identifier, set as today
   if (!"article_id" %in% colnames(newdat)) {
     newdat <- newdat %>%
       mutate(article_id = NA)
   }
   
+  # Create identifer columns
   newdat <- newdat %>%
     mutate(pmid = "") %>%
-    mutate(uid = paste0("psychinfo-", article_id)) 
+    mutate(uid = paste0("psychinfo-", .data$article_id)) 
   
+  # Set source
   newdat$source <- "psychinfo"
   
+  # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
+  
+  # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
   
+  # Return formatted dataframe
   return(newdat)
 }
 
-#' Process Medline references
+#' Process Manually Uploaded Search results from MEDLINE
 #'
-#' This function processes references from Medline.
+#' Internal function used to process MEDLINE search results an format for SOLES.
 #'
-#' @param path The file path of the data.
+#' @param path the file path to the search results
 #'
-#' @return A processed data frame.
+#' @return a processed dataframe containing search results
 #'
 #' @details
 #' This function reads references from the specified file using the "ovid" tag naming convention. 
@@ -354,56 +317,74 @@ process_psychinfo <- function(path){
 #' @import dplyr
 process_medline <- function(path){
   
+  # Extract file extension
+  file_extension <- tools::file_ext(path)
+  
+  # Check file extension
+  if (!file_extension %in% c("ris", "bib", "txt")) {
+    stop(message("Error: File type not supported"))
+  }
+  
+  # Read in data using synthesisr
   newdat <- synthesisr::read_refs(path, tag_naming = "ovid")
   
+  # Rename columns for SOLES
   newdat$number <- newdat$issue
   newdat$ptype <- newdat$PT
   newdat$url <- newdat$L2
   newdat$author_affiliation <- newdat$M2
   
+  # If book, use booktitle as title
   if("booktitle" %in% colnames(newdat)) {
     newdat <-newdat %>%
-      tidyr::unite(title, booktitle, na.rm = TRUE)
+      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
   }
   
+  # If has both start and end page, combine both
   if("start_page" %in% colnames(newdat) &
      "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(pages, start_page, end_page, sep="-", na.rm=TRUE)
+      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep="-", na.rm=TRUE)
   } else{
-    
+    # Else take start page only
     newdat <- newdat %>%
-      mutate(pages = start_page)
+      mutate(pages = .data$start_page)
   }
   
+  # Set dat as today
   newdat$date  <-  format(Sys.Date(), "%d%m%y")
   
+  # If no article identifier, set as NA
   if (!"article_id" %in% colnames(newdat)) {
     newdat <- newdat %>%
       mutate(article_id = NA)
   }
   
-  print(newdat$article_id)
-  
+  # Assign identifiers
   newdat <- newdat %>%
-    mutate(pmid = article_id) %>%
-    mutate(uid = paste0("medline-", article_id)) 
+    mutate(pmid = .data$article_id) %>%
+    mutate(uid = paste0("medline-", .data$article_id)) 
   
+  # Set source
   newdat$source <- "medline"
   
+  # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
+  
+  # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
   
+  # Return formatted dataframe
   return(newdat)
 }
 
-#' Process Web of Science references
+#' Process Manually Uploaded Search results from Web of Science
 #'
-#' This function processes references from Web of Science.
+#' Internal function used to process Web of Science search results an format for SOLES.
 #'
-#' @param path The file path of the data.
+#' @param path the file path to the search results
 #'
-#' @return A processed data frame.
+#' @return a processed dataframe containing search results
 #'
 #' @details
 #' This function reads references from the specified file in BibTeX or RIS format using the "wos" database source.
@@ -431,87 +412,115 @@ process_wos <- function(path){
     # Extract data
     newdat <- synthesisr::read_refs(path, tag_naming = "ovid")
     
-    # Look for column names
+    # If start and end page give, combine both
     if("start_page" %in% colnames(newdat) &
        "end_page" %in% colnames(newdat)) {
       newdat <- newdat %>%
-        tidyr::unite(pages, start_page, end_page, sep="-", na.rm=TRUE)
+        tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep="-", na.rm=TRUE)
     } else{
-      
+      # Else use start page only
       newdat <- newdat %>%
-        mutate(pages = start_page)
+        mutate(pages = .data$start_page)
     }
     
+    # If secondary title not given, create and set to NA
     if (!"secondarytitle" %in% colnames(newdat)) {
       newdat <- newdat %>%
         mutate(secondarytitle = NA)
     }
+    
+    # If ISBN not given, create and set to NA
     if (!"isbn" %in% colnames(newdat)) {
       newdat <- newdat %>%
         mutate(isbn = NA)
     }
+    
+    # If PMID not given, create and set to NA
     if (!"pmid" %in% colnames(newdat)) {
       newdat <- newdat %>%
         mutate(pmid = NA)
     }
+    
+    # If author country not given, create and set to NA
     if (!"author_country" %in% colnames(newdat)) {
       newdat <- newdat %>%
         mutate(author_country = NA)
     }
     
-    # Add source, date, url info
+    # Set source
     newdat$source <- "wos"
+    
+    # Set date to today
     newdat$date  <-  format(Sys.Date(), "%d%m%y")
+    
+    # Create url
     newdat$url <- paste0("https://www.webofscience.com/wos/woscc/full-record/", newdat$uid)
     
-    # Sort out column names
+    # Select correctly named column names for SOLES
     newdat <- newdat %>% 
-      select(uid = AN, author = AU, year = PY, journal = T2, doi, title = TI, 
-             pages, volume, abstract = AB, 
-             isbn, keywords, secondarytitle, url, date, issn, pmid, ptype = source_type,
-             source, number = issue, author_country, author_affiliation = PA)
+      select(uid = .data$AN, author = .data$AU, year = .data$PY, journal = .data$T2, 
+             .data$doi, title = .data$TI, .data$pages, .data$volume, 
+             abstract = .data$AB, .data$isbn, .data$keywords, .data$secondarytitle, 
+             .data$url, .data$date, .data$issn, .data$pmid, ptype = .data$source_type,
+             .data$source, number = .data$issue, .data$author_country, 
+             author_affiliation = .data$PA)
     
-    # Format
+    # Run format DOI function to ensure DOIs are consistently formatted
     newdat <- format_doi(newdat)
+    
+    # Run format columns function to ensure columns are consistent and compatible for SOLES
     newdat <- format_cols(newdat)
     
   } else if (file_extension %in% c("bib")) {
     
-    # read in 
+    # Read data using bibliometrix package
     newdat <- bibliometrix::convert2df(path, dbsource = "wos", format="bibtex")
     
-    # sort out naming
+    # Get column names
     lookup_table <- setNames(field_codes_wos$Field, field_codes_wos$Abbreviation)
     colnames(newdat) <- lookup_table[colnames(newdat)]
     
-    # remove columns that are blank
+    # Remove columns that are blank
     keep.cols <- names(newdat) %in% NA
     newdat <- newdat [! keep.cols]
     rownames(newdat) <- 1:nrow(newdat)
     
-    # adding source info
+    # Set source
     newdat$source <- "wos"
+    
+    # Create unique identifier
     newdat['uid'] <- lapply(newdat['uid'], function(x) gsub("WOS", "wos:", x))
+    
+    # Get author country
     newdat$author_country <- stringr::str_extract(newdat$author_country, "\\b(\\w+)\\b$")
+    # Make title cause
     newdat$author_country  <- tools::toTitleCase(newdat$author_country)
+    
+    # Rename pubication type column
     newdat$ptype  <- newdat$article_type
     
+    # Run format DOI function to ensure DOIs are consistently formatted
     newdat <- format_doi(newdat)
+    
+    # Run format columns function to ensure columns are consistent and compatible for SOLES
     newdat <- format_cols(newdat)
     
+  } else {
+    stop(message("Error: File type not supported"))
   }
   
+  # Return processed dataframe
   return(newdat)
   
 }
 
-#' Process PubMed references
+#' Process Manually Uploaded Search results from PubMed
 #'
-#' This function processes references from PubMed.
+#' Internal function used to process PubMed search results an format for SOLES.
 #'
-#' @param path The file path of the data.
+#' @param path the file path to the search results
 #'
-#' @return A processed data frame.
+#' @return a processed dataframe containing search results
 #'
 #' @details
 #' This function reads references from the specified file in PubMed format using the "pubmed" database source. 
@@ -530,39 +539,59 @@ process_wos <- function(path){
 #' @importFrom stringr str_extract
 #' @import dplyr
 process_pubmed <- function(path){
-  # try wos format
+  
+  # Extract file extension
+  file_extension <- tools::file_ext(path)
+  
+  # Check file extension
+  if (!file_extension %in% c("ris", "bib")) {
+    stop(message("Error: File type not supported"))
+  }
+  
+  # Read in data using bibliometrix
   newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format="pubmed")
   
-  # sort out naming
+  # Get column names
   lookup_table <- setNames(field_codes_pubmed$Field, field_codes_pubmed$Abbreviation)
   colnames(newdat) <- lookup_table[colnames(newdat)]
   
-  # remove columns that are blank
+  # Remove columns that are blank
   keep.cols <- names(newdat) %in% NA
   newdat <- newdat [! keep.cols]
   rownames(newdat) <- 1:nrow(newdat)
   
+  # Set source
   newdat$source <- "pubmed"
-  colnames(newdat) <- gsub("^keywords_plus.*$", "keywords_plus", colnames(newdat))
-  newdat$ptype <- newdat$document_type
-  newdat <- newdat %>%
-    mutate(uid = paste0("pubmed-", record_id)) %>%
-    mutate(pmid = record_id) %>%
-    mutate(doi = ifelse(is.na(doi), stringr::str_extract(article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), doi))
   
+  # Fix column names for keywords
+  colnames(newdat) <- gsub("^keywords_plus.*$", "keywords_plus", colnames(newdat))
+  
+  # Rename publication type
+  newdat$ptype <- newdat$document_type
+  
+  # Create unique identifiers
+  newdat <- newdat %>%
+    dplyr::mutate(uid = paste0("pubmed-", .data$record_id)) %>%
+    dplyr::mutate(pmid = .data$record_id) %>%
+    dplyr::mutate(doi = ifelse(is.na(.data$doi), stringr::str_extract(.data$article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), .data$doi))
+  
+  # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
+  
+  # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
   
+  # Return processed dataframe
   return(newdat)
 }
 
-#' Process Scopus references
+#' Process Manually Uploaded Search results from Scopus
 #'
-#' This function processes references from Scopus.
+#' Internal function used to process Scopus search results an format for SOLES.
 #'
-#' @param path The file path of the data.
+#' @param path the file path to the search results
 #'
-#' @return A processed data frame.
+#' @return a processed dataframe containing search results
 #'
 #' @details
 #' This function reads references from the specified file using the "ovid" tag naming convention. 
@@ -581,18 +610,28 @@ process_pubmed <- function(path){
 #' @import dplyr
 process_scopus <- function(path){
   
+  # Extract file extension
+  file_extension <- tools::file_ext(path)
+  
+  # Check file extension
+  if (!file_extension %in% c("ris", "bib", "txt")) {
+    stop(message("Error: File type not supported"))
+  }
+  
+  # Read in data using synthesr package
   newdat <- synthesisr::read_refs(path, tag_naming = "scopus")
   
+  # Rename issue as number
   newdat$number <- newdat$issue
   
-  # affiliation
+  # Set author affiliation column
   if("address" %in% colnames(newdat)) {
     newdat$author_affiliation <- newdat$address
   } else if("affiliations" %in% colnames(newdat)) {
     newdat$author_affiliation <- newdat$affiliations
   }
   
-  # journal name
+  # Reanme source as journal
   if("source" %in% colnames(newdat) &
      isFALSE(grepl("scopus", newdat$source, ignore.case = T))) {
     newdat$journal <- newdat$source
@@ -600,109 +639,112 @@ process_scopus <- function(path){
     newdat$journal <- newdat$source_title
   }
   
-  # publication type
+  # Rename publication type
   if("source_type" %in% colnames(newdat)) {
     newdat$ptype <- newdat$source_type
   } else if("document_type" %in% colnames(newdat)) {
     newdat$ptype <- newdat$document_type
   }
   
+  # If book, use booktitle in title
   if("booktitle" %in% colnames(newdat)) {
     newdat <-newdat %>%
-      tidyr::unite(title, booktitle, na.rm = TRUE)
+      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
   }
   
-  # pages
+  # If start and end pages both given, combine
   if("start_page" %in% colnames(newdat) &
      "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(pages, start_page, end_page, sep="-", na.rm=TRUE)
-    
+      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep="-", na.rm=TRUE)
   } else if("page_start" %in% colnames(newdat) &
             "page_end" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(pages, page_start, page_end, sep="-", na.rm=TRUE)
-    
+      tidyr::unite(.data$pages, .data$page_start, .data$page_end, sep="-", na.rm=TRUE)
   } else {
-    
+    # Else use only start page
     newdat <- newdat %>%
-      mutate(pages = start_page)
+      mutate(pages = .data$start_page)
   }
   
-  # date
+  # Set date as today's date
   newdat$date  <-  format(Sys.Date(), "%d%m%y")
   
-  # identifier
+  # If no identifier given, set as NA
   if (!"article_id" %in% colnames(newdat)) {
     newdat <- newdat %>%
       mutate(article_id = NA)
   }
   
-  pattern <- "eid=(2-s2\\.0-\\d+)"
-  
+  # Rename link to url
   if(!"url" %in% colnames(newdat) &
      "link" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(url = link)
+    newdat <- newdat %>% rename(url = .data$link)
   }
   
+  # Get pattern for unique identifiers
+  pattern <- "eid=(2-s2\\.0-\\d+)"
+  
+  # Create unique identifier
   newdat <- newdat %>%
     ungroup() %>%
-    mutate(uid = ifelse(!is.na(url), stringr::str_extract(url, pattern), 
+    mutate(uid = ifelse(!is.na(.data$url), stringr::str_extract(.data$url, pattern), 
                         paste0("unknown-accession-", floor(runif(n(), min=100, max=10000000))))) %>%
-    dplyr::mutate(uid = gsub("eid=", "", uid)) %>%
-    dplyr::mutate(pmid = pubmed_id) %>%
-    dplyr::mutate(uid = paste0("scopus-", uid))
+    dplyr::mutate(uid = gsub("eid=", "", .data$uid)) %>%
+    dplyr::mutate(pmid = .data$pubmed_id) %>%
+    dplyr::mutate(uid = paste0("scopus-", .data$uid))
   
-  # Check for duplicate IDs - extremely unlikely
-  dup_id <- newdat %>% 
-    dplyr::group_by(uid) %>%
-    dplyr::count() %>%
-    filter(n > 1)
-  
-  # If duplicates are found, return an error message
-  if (nrow(dup_id) > 0) {
-    stop("There's been an error in generating identifiers for SCOPUS. Please retry.")
-  }
-  
+  # Set source
   newdat$source <- "scopus"
   
-  # additional formatting for potential new scopus export
+  # Format author column
   if(!"author" %in% colnames(newdat) &
      "ef_bb_bf_author" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(author = ef_bb_bf_author)
+    newdat <- newdat %>% rename(author = .data$ef_bb_bf_author)
   }
   
+  # Format keywords column
   if(!"keywords" %in% colnames(newdat) &
      "author_keywords" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(keywords = author_keywords)
+    newdat <- newdat %>% rename(keywords = .data$author_keywords)
   }
   
+  # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
+  
+  # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
   
+  # Return processed dataframe
   return(newdat)
 }
 
-#' Process XML File
+#' Process Manually Uploaded Search results from Endnote XML file
 #'
-#' This function parses an XML file containing bibliographic information and extracts relevant fields.
+#' Internal function used to process EndNote exports as XML an format for SOLES.
 #'
-#' @param path The file path to the XML file.
-#' @return A data frame containing parsed bibliographic information.
+#' @param path the file path to the search results
+#'
+#' @return a processed dataframe containing search results
 #' @import XML
 #' @import dplyr
 #' @export
-process_xml <- function(path){
+process_endnote <- function(path){
   
+  # Parse the XML file
   newdat <- XML::xmlParse(path)
+  
+  # Get the record node
   x <- XML::getNodeSet(newdat, "//record")
   
+  # Define a function for getting required data
   xpath2 <- function(x, ...) {
     y <- XML::xpathSApply(x, ...)
     y <- gsub(",", "", y)
     ifelse(length(y) == 0, NA, paste(y, collapse = ", "))
   }
   
+  # Get required data from EndNote XML
   newdat <- data.frame(author = sapply(x, xpath2, ".//author", xmlValue),
                        year = sapply(x, xpath2, ".//dates/year", xmlValue),
                        journal = sapply(x, xpath2, ".//periodical/full-title",  xmlValue),
@@ -722,34 +764,40 @@ process_xml <- function(path){
                        accession = sapply(x, xpath2, ".//accession-num", xmlValue),
                        url = sapply(x, xpath2, ".//url", xmlValue))
   
+  # Set pattern for Scopus identifiers
   pattern <- "eid=(2-s2\\.0-\\d+)"
   
+  # Set source for each record depending on origin
   newdat <- newdat %>%
     mutate(source = case_when(
-      grepl("scopus", url, ignore.case = TRUE) ~ "scopus",
-      grepl("Embase", database, ignore.case = TRUE) ~ "embase",
-      grepl("pubmed", database, ignore.case = TRUE) ~ "pubmed",
-      grepl("BIOSIS", url, ignore.case = TRUE) ~ "biosis",
-      grepl("BCI:", url, ignore.case = TRUE) ~ "biosis",
-      grepl("wos", accession, ignore.case = TRUE) ~ "wos",
-      grepl("medline", database, ignore.case = TRUE) ~ "medline",
+      grepl("scopus", .data$url, ignore.case = TRUE) ~ "scopus",
+      grepl("Embase", .data$database, ignore.case = TRUE) ~ "embase",
+      grepl("pubmed", .data$database, ignore.case = TRUE) ~ "pubmed",
+      grepl("BIOSIS", .data$url, ignore.case = TRUE) ~ "biosis",
+      grepl("BCI:", .data$url, ignore.case = TRUE) ~ "biosis",
+      grepl("wos", .data$accession, ignore.case = TRUE) ~ "wos",
+      grepl("medline", .data$database, ignore.case = TRUE) ~ "medline",
       TRUE ~ "unknown"  # Keep the original source if none of the conditions match
     )) %>%
     ungroup()
   
+  # Set identifiers for each second depending on origin
   newdat <- newdat %>%
     rowwise() %>%
-    mutate(accession = ifelse(source %in% "scopus", regmatches(url, regexpr(pattern, url)), accession)) %>%
+    mutate(accession = ifelse(.data$source %in% "scopus", regmatches(url, regexpr(pattern, .data$url)), .data$accession)) %>%
     ungroup() %>%
-    mutate(accession = ifelse(is.na(accession), paste0("noid:", 1000 + row_number()), accession)) %>%
-    mutate(accession = gsub("eid=", "", accession)) %>%
-    mutate(accession = gsub("WOS:", "", accession)) %>%
-    mutate(uid = paste0(source, "-", accession)) %>%
-    mutate(uid = gsub("unknown-noid:", "unknown-", uid))  
+    mutate(accession = ifelse(is.na(.data$accession), paste0("noid:", 1000 + row_number()), .data$accession)) %>%
+    mutate(accession = gsub("eid=", "", .data$accession)) %>%
+    mutate(accession = gsub("WOS:", "", .data$accession)) %>%
+    mutate(uid = paste0(.data$source, "-", .data$accession)) %>%
+    mutate(uid = gsub("unknown-noid:", "unknown-", .data$uid))  
   
+  # Run format DOI function to ensure DOIs are consistently formatted
+  newdat <- format_doi(newdat)
   
-  format_cols(newdat)
-  format_doi(newdat)
+  # Run format columns function to ensure columns are consistent and compatible for SOLES
+  newdat <- format_cols(newdat)
   
+  # Return processed dataframe
   return(newdat)
 }
