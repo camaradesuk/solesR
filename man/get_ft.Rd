@@ -27,7 +27,7 @@ get_ft(
 
 \item{check_failed}{logical; check failed pdfs again?}
 
-\item{email}{email address required for unpaywall}
+\item{email}{email address required for UnPaywall}
 }
 \description{
 This function downloads the full text of included citations
