@@ -68,7 +68,9 @@ Imports:
     tidyr,
     plyr,
     dplyr,
-    dbplyr
+    dbplyr,
+    httr,
+    jsonlite
 VignetteBuilder: knitr
 Remotes:  
     kaitlynhair/RISmed,
