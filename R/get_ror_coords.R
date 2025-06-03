@@ -21,28 +21,28 @@
 get_ror_coords <- function(con){
   
   # if table doesn't exist, create it ----
-  if (!dbExistsTable(con, "ror_coords")) {
+  if (!DBI::dbExistsTable(con, "ror_coords")) {
     
     
     ror_coords <- data.frame(ror = as.character(),
                              longitude = as.numeric(),
                              latitude = as.numeric())
     
-    dbWriteTable(con, "ror_coords", ror_coords)
+    DBI::dbWriteTable(con, "ror_coords", ror_coords)
     message("Created ror_coords table.")
     
   }
   
   # Gather the tables in their current state ----
-  ror_coords_full <- tbl(con, "ror_coords") %>% 
+  ror_coords_full <- dplyr::tbl(con, "ror_coords") %>% 
     collect()
   
   # Get data to tag ----
-  institutions <- dbReadTable(con, "institution_tag") %>%
-    select(ror) %>%
-    filter(ror != "Unknown") %>%
-    distinct() %>%
-    filter(!ror %in% ror_coords_full$ror)
+  institutions <- DBI::dbReadTable(con, "institution_tag") %>%
+    dplyr::select(ror) %>%
+    dplyr::filter(ror != "Unknown") %>%
+    dplyr::distinct() %>%
+    dplyr::filter(!ror %in% ror_coords_full$ror)
   
   # Print number left to tag ----
   print(paste0(nrow(institutions), " records left to tag!"))
@@ -90,7 +90,7 @@ get_ror_coords <- function(con){
                            institutions$ror)
   
   # Append to database ----
-  dbWriteTable(con, "ror_coords", institutions, append = TRUE)
+  DBI::dbWriteTable(con, "ror_coords", institutions, append = TRUE)
   
   # Print result ----
   print(paste0(sum(complete.cases(institutions)), " out of ",nrow(institutions)," records tagged with coordinates."))
