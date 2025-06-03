@@ -343,7 +343,10 @@ pico_tag <- function(con, tag_type, tag_method, tag_main_category="all", ignore_
 #' @examples
 #' \dontrun{
 #' Tag studies using full text regex
-#' complete_pico_tag(con, tag_method = "fulltext", tag_type = "intervention", tag_main_category = "all")
+#' complete_pico_tag(con, 
+#' tag_method = "fulltext", 
+#' tag_type = "intervention", 
+#' tag_main_category = "all")
 #'}
 #' @import dplyr
 #' @import dbplyr

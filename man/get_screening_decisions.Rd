@@ -20,7 +20,9 @@ in the specified database and returns a data frame in the correct format to run 
 }
 \examples{
 \dontrun{
-  screening_decisions <- get_screening_decisions(con = your_database_connection, review_id = "your_project_plus_date")
+  screening_decisions <- get_screening_decisions(
+  con = your_database_connection, 
+  review_id = "your_project_plus_date")
 }
 
 }
