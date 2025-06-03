@@ -61,7 +61,7 @@ get_new_unique <- function(con, new_citations, prev_months=2){
     deduplicated_dataframes <- list()
     
     citations <- citations %>%
-      arrange(year, title, author)
+      arrange(.data$year, .data$title, .data$author)
     
     split_citations <- split(citations, ceiling(seq(nrow(citations))/50000))
     
@@ -101,13 +101,14 @@ get_new_unique <- function(con, new_citations, prev_months=2){
     new_unique$issn <- new_unique$isbn
     
     new_unique <- new_unique %>%
-      select(uid, source, author, year, journal, doi, title,
-             pages, volume, abstract, isbn, keywords,
-             secondarytitle, url, date, issn, pmid, ptype, 
-             source, author_country, number, author_affiliation)
+      select(.data$uid, .data$source, .data$author, .data$year, .data$journal, 
+             .data$doi, .data$title, .data$pages, .data$volume, .data$abstract, 
+             .data$isbn, .data$keywords, .data$secondarytitle, .data$url, 
+             .data$date, .data$issn, .data$pmid, .data$ptype, .data$source, 
+             .data$author_country, .data$number, .data$author_affiliation)
     
     new_unique <- new_unique %>%
-      filter(!grepl("in_db_already", .$source))
+      filter(!grepl("in_db_already", .data$source))
     
     return(new_unique)
   }
@@ -116,16 +117,16 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   
   # # keep accession info
   matching_ids <- new_unique %>%
-    select(uid, record_ids, doi, source, pmid) %>%
-    mutate(wos_accession = ifelse(grepl("wos:", record_ids),
-                                  paste(gsub(".*wos:", "", record_ids)),
+    select(.data$uid, .data$record_ids, .data$doi, .data$source, .data$pmid) %>%
+    mutate(wos_accession = ifelse(grepl("wos:", .data$record_ids),
+                                  paste(gsub(".*wos:", "", .data$record_ids)),
                                   "")) %>%
-    mutate(wos_accession = gsub(",.*", "", wos_accession)) %>%
-    mutate(scopus_accession = ifelse(grepl("scopus-", record_ids),
-                                     paste(gsub(".*scopus-", "", record_ids)),
+    mutate(wos_accession = gsub(",.*", "", .data$wos_accession)) %>%
+    mutate(scopus_accession = ifelse(grepl("scopus-", .data$record_ids),
+                                     paste(gsub(".*scopus-", "", .data$record_ids)),
                                      "")) %>%
-    mutate(scopus_accession = gsub(",.*", "", scopus_accession)) %>%
-    select(-source, -record_ids)
+    mutate(scopus_accession = gsub(",.*", "", .data$scopus_accession)) %>%
+    select(-.data$source, -.data$record_ids)
   
   matching_ids <- matching_ids %>% mutate_all(na_if,"")
   
@@ -138,7 +139,7 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   } else {
     existing_match_ids <- dbReadTable(con, "unique_citations")
     existing_match_ids <- existing_match_ids %>%
-      select(uid) %>%
+      select(.data$uid) %>%
       mutate(pmid = NA, 
              wos_accession =NA,
              scopus_accession =NA)
@@ -147,15 +148,15 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   }
   
   match_comb <- match_comb %>%
-    group_by(uid) %>%
-    arrange(wos_accession) %>%
-    mutate(wos_accession = first(wos_accession)) %>%
-    arrange(scopus_accession) %>%
-    mutate(scopus_accession = first(scopus_accession)) %>%
-    arrange(pmid) %>%
-    mutate(pmid = first(pmid)) %>%
-    arrange(doi) %>%
-    mutate(doi = first(doi)) %>%
+    group_by(.data$uid) %>%
+    arrange(.data$wos_accession) %>%
+    mutate(wos_accession = first(.data$wos_accession)) %>%
+    arrange(.data$scopus_accession) %>%
+    mutate(scopus_accession = first(.data$scopus_accession)) %>%
+    arrange(.data$pmid) %>%
+    mutate(pmid = first(.data$pmid)) %>%
+    arrange(.data$doi) %>%
+    mutate(doi = first(.data$doi)) %>%
     unique() %>%
     ungroup()
   
@@ -168,13 +169,14 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   new_unique$issn <- new_unique$isbn
   
   new_unique <- new_unique %>%
-    select(uid, source, author, year, journal, doi, title,
-           pages, volume, abstract, isbn, keywords,
-           secondarytitle, url, date, issn, pmid, ptype, 
-           source, author_country, number, author_affiliation)
+    select(.data$uid, .data$source, .data$author, .data$year, .data$journal, 
+           .data$doi, .data$title, .data$pages, .data$volume, .data$abstract, 
+           .data$isbn, .data$keywords, .data$secondarytitle, .data$url, 
+           .data$date, .data$issn, .data$pmid, .data$ptype, .data$source, 
+           .data$author_country, .data$number, .data$author_affiliation)
   
   new_unique <- new_unique %>%
-    filter(!grepl("in_db_already", .$source)) 
+    filter(!grepl("in_db_already", .data$source)) 
   message(paste0("identified ", nrow(new_unique), " new unique citations"))
   
   return(new_unique)
@@ -204,19 +206,19 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
   
   # remove duplicate uids
   citations <- citations %>%
-    group_by(uid) %>%
+    group_by(.data$uid) %>%
     slice_head() %>%
     ungroup()
   
   # remove citations with the same pmid
   citations_no_pmid <- citations %>% 
-    filter(pmid == "" | is.na(pmid))
+    filter(.data$pmid == "" | is.na(.data$pmid))
   
   # get studies with a pmid and slice to keep only one per pmid 
   # note that studies with no pmid are not included here to avoid keeping only one study with NA pmid / missing pmid
   citations_with_pmid <- citations %>%
-    filter(!uid %in% citations_no_pmid$uid) %>% 
-    group_by(pmid) %>% 
+    filter(!.data$uid %in% citations_no_pmid$uid) %>% 
+    group_by(.data$pmid) %>% 
     slice_head() %>% 
     ungroup()
   
@@ -237,7 +239,7 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
     if (is.null(arrange_by)) {
       
       citations <- citations %>%
-        arrange(year, title, author)
+        arrange(.data$year, .data$title, .data$author)
       
     } else {
       
@@ -277,10 +279,11 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
     res_unique$issn <- res_unique$isbn
     
     res_unique <- res_unique %>%
-      select(uid, source, author, year, journal, doi, title,
-             pages, volume, abstract, isbn, keywords,
-             secondarytitle, url, date, issn, pmid, ptype, 
-             source, author_country, number, author_affiliation)
+      select(.data$uid, .data$source, .data$author, .data$year, .data$journal, 
+             .data$doi, .data$title, .data$pages, .data$volume, .data$abstract, 
+             .data$isbn, .data$keywords, .data$secondarytitle, .data$url, 
+             .data$date, .data$issn, .data$pmid, .data$ptype, .data$source, 
+             .data$author_country, .data$number, .data$author_affiliation)
     
     res_unique <- format_doi(res_unique)
     
@@ -297,29 +300,29 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
   
   # # keep accession info
   matching_ids <- res_unique %>%
-    select(uid, record_ids, doi, source, pmid) %>%
-    mutate(wos_accession = ifelse(grepl("wos", record_ids),
-                                  paste(gsub(".*wos.", "", record_ids)),
+    select(.data$uid, .data$record_ids, .data$doi, .data$source, .data$pmid) %>%
+    mutate(wos_accession = ifelse(grepl("wos", .data$record_ids),
+                                  paste(gsub(".*wos.", "", .data$record_ids)),
                                   "")) %>%
-    mutate(wos_accession = gsub(",.*", "", wos_accession)) %>%
-    mutate(scopus_accession = ifelse(grepl("scopus-", record_ids),
-                                     paste(gsub(".*scopus-", "", record_ids)),
+    mutate(wos_accession = gsub(",.*", "", .data$wos_accession)) %>%
+    mutate(scopus_accession = ifelse(grepl("scopus-", .data$record_ids),
+                                     paste(gsub(".*scopus-", "", .data$record_ids)),
                                      "")) %>%
-    mutate(scopus_accession = gsub(",.*", "", scopus_accession)) %>%
-    select(-source, -record_ids)
+    mutate(scopus_accession = gsub(",.*", "", .data$scopus_accession)) %>%
+    select(-.data$source, -.data$record_ids)
   
   matching_ids <- matching_ids %>% mutate_all(na_if,"")
   
   match_comb <- matching_ids %>%
-    group_by(uid) %>%
-    arrange(wos_accession) %>%
-    mutate(wos_accession = first(wos_accession)) %>%
-    arrange(scopus_accession) %>%
-    mutate(scopus_accession = first(scopus_accession)) %>%
-    arrange(pmid) %>%
-    mutate(pmid = first(pmid)) %>%
-    arrange(doi) %>%
-    mutate(doi = first(doi)) %>%
+    group_by(.data$uid) %>%
+    arrange(.data$wos_accession) %>%
+    mutate(wos_accession = first(.data$wos_accession)) %>%
+    arrange(.data$scopus_accession) %>%
+    mutate(scopus_accession = first(.data$scopus_accession)) %>%
+    arrange(.data$pmid) %>%
+    mutate(pmid = first(.data$pmid)) %>%
+    arrange(.data$doi) %>%
+    mutate(doi = first(.data$doi)) %>%
     unique() %>%
     ungroup()
   
@@ -330,10 +333,11 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
   res_unique$issn <- res_unique$isbn
   
   res_unique <- res_unique %>%
-    select(uid, source, author, year, journal, doi, title,
-           pages, volume, abstract, isbn, keywords,
-           secondarytitle, url, date, issn, pmid, ptype, 
-           source, author_country, number, author_affiliation)
+    select(.data$uid, .data$source, .data$author, .data$year, .data$journal, 
+           .data$doi, .data$title, .data$pages, .data$volume, .data$abstract, 
+           .data$isbn, .data$keywords, .data$secondarytitle, .data$url, 
+           .data$date, .data$issn, .data$pmid, .data$ptype, .data$source, 
+           .data$author_country, .data$number, .data$author_affiliation)
   
   message(paste0("identified ", nrow(res_unique), " unique citations"))
   
