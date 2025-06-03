@@ -34,6 +34,7 @@
 #' @import dplyr
 #' @import fst
 #' @import crayon
+#' @importFrom utils menu
 #' @export
 check_tables <- function(con, delete_redundant = FALSE) {
   
@@ -107,7 +108,7 @@ check_tables <- function(con, delete_redundant = FALSE) {
         
         cat(red("The table", table_name, "contains problematic values ('na', '', ' ').\n"))
         
-        change_values <- menu(c("Yes", "No"),
+        change_values <- utils::menu(c("Yes", "No"),
                               title = message("Would you like to correct these values by replacing them with NA?"))
         
         if (change_values == 1) {
@@ -190,7 +191,7 @@ check_tables <- function(con, delete_redundant = FALSE) {
         if (wos_uids_count > 0) {
           cat(red("Number of uids starting with 'wos:' in", table_name, ":", wos_uids_count, "\n"))
           
-          change_uids <- menu(c("Yes", "No"),
+          change_uids <- urils::menu(c("Yes", "No"),
                               title = message("Do you want to change all wos uids starting with 'wos:' to 'wos-'?"))
           
           if (change_uids == 1) {
@@ -240,7 +241,7 @@ check_tables <- function(con, delete_redundant = FALSE) {
           
           cat(red("Number of uids starting with '2-' in", table_name, ":", scopus_uids_count, "\n"))
           
-          change_uids <- menu(c("Yes", "No"),
+          change_uids <- utils::menu(c("Yes", "No"),
                               title = message("Do you want to change all scopus uids starting with '2-' to 'scopus-2-'?"))
           
           if (change_uids == 1) {
@@ -301,7 +302,7 @@ check_tables <- function(con, delete_redundant = FALSE) {
           
           cat(red("There are", nrow(doi_check), "dois in", table_name, "which are formatted incorrectly\n"))
           
-          change_dois <- menu(c("Yes", "No"),
+          change_dois <- utils::menu(c("Yes", "No"),
                               title = message("Would you like to reformat them all using format_doi()"))
           
           if (change_dois == 1) {
@@ -360,7 +361,7 @@ check_tables <- function(con, delete_redundant = FALSE) {
     
     message(paste("Warning: This will DELETE database tables that are redundant in the current SOLES workflow"))
     
-    user_input <- menu(c("Yes", "No"),
+    user_input <- utils::menu(c("Yes", "No"),
                        title= paste("Are you sure you want to proceed?"))
     
     
