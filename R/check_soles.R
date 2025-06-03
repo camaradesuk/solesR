@@ -191,7 +191,7 @@ check_tables <- function(con, delete_redundant = FALSE) {
         if (wos_uids_count > 0) {
           cat(red("Number of uids starting with 'wos:' in", table_name, ":", wos_uids_count, "\n"))
           
-          change_uids <- urils::menu(c("Yes", "No"),
+          change_uids <- utils::menu(c("Yes", "No"),
                               title = message("Do you want to change all wos uids starting with 'wos:' to 'wos-'?"))
           
           if (change_uids == 1) {
