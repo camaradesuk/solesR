@@ -321,19 +321,18 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   message("Running PubMed search...")
 
   # Get summary of NCBI EUtils query
-  pubmed_search <- RISmed::EUtilsSummary(query,
-    retmax = retMax,
+  pubmed_search <- RISmed::EUtilsSummary(
+    query, 
+    retmax=retMax,
     mindate = paste0(format(min_date_char, "%Y/%m/%d")),
-    maxdate = paste0(format(max_date_char, "%Y/%m/%d")),
-    type = "esearch",
-    db = "pubmed"
-  )
+    maxdate=paste0(format(max_date_char, "%Y/%m/%d")),
+    type="esearch", db="pubmed")
 
   # Get summary
-  summary <- RISmed::summary(pubmed_search)
+  pubmed_summary <- RISmed::summary(pubmed_search)
 
   # Try running search query using RISmed R package
-  records <- tryCatch(
+  pubmed_records <- tryCatch(
     {
       # Try getting results
       records <- RISmed::EUtilsGet(pubmed_search)
@@ -343,110 +342,23 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
       stop("Error in calling RISmed::EUtilsGet()", conditionMessage(e))
     }
   )
-
-  # Create an empty vector to store author information
-  authors <- vector()
-  # Format author information
-  for (n in 1:length(records@Author)) {
-    if (exists("tmp")) {
-      rm(tmp)
+  
+  # Check if correct package is used
+  try({
+    if (pubmed_search@count < 1) {
+      # Exit if no records found
+      stop(message("No records found"))
+    } else if (inherits(pubmed_results, "Medline")) {
+      # Return warning if result is a Medline object
+      warning("Error: A Medline object is returned instead of a dataframe. For output compatible with the SOLES workflow, update the RISmed package from: https://github.com/kaitlynhair/RISmed")
     }
-    if (exists("tmp2")) {
-      rm(tmp2)
-    }
-    try(tmp <- paste0(records@Author[[n]]$LastName, ", ", records@Author[[n]]$Initials), silent = TRUE)
-    try(tmp2 <- paste(tmp, collapse = "; "), silent = TRUE)
-    if (exists("tmp2")) {
-      if (length(tmp2) > 0) {
-        authors <- append(authors, tmp2)
-      } else {
-        authors <- append(authors, NA)
-      }
-    } else {
-      authors <- append(authors, NA)
-    }
-  }
-
-  # Create an empty vector to store author country information
-  country <- vector()
-  # Format author country information
-  for (n in 1:length(records@Country)) {
-    if (exists("tmp")) {
-      rm(tmp)
-    }
-    if (exists("tmp2")) {
-      rm(tmp2)
-    }
-    try(tmp <- paste0(records@Country[[n]]), silent = TRUE)
-    try(tmp2 <- paste(tmp, collapse = "; "), silent = TRUE)
-    if (exists("tmp2")) {
-      if (length(tmp2) > 0) {
-        country <- append(country, tmp2)
-      } else {
-        country <- append(country, NA)
-      }
-    } else {
-      country <- append(country, NA)
-    }
-  }
-
-  # Create an empty vector for keyword information
-  keywords <- vector()
-  # Format keywords information
-  for (n in 1:length(records@Keywords)) {
-    if (exists("tmp")) {
-      rm(tmp)
-    }
-    if (exists("tmp2")) {
-      rm(tmp2)
-    }
-    try(tmp <- paste0(records@Keywords[[n]]), silent = TRUE)
-    try(tmp2 <- paste(tmp, collapse = "; "), silent = TRUE)
-    if (exists("tmp2")) {
-      if (length(tmp2) > 0) {
-        keywords <- append(keywords, tmp2)
-      } else {
-        keywords <- append(keywords, NA)
-      }
-    } else {
-      keywords <- append(keywords, NA)
-    }
-  }
-
-  # Format medline object into a dataframe
-  pubmed_results <- data.frame(
-    "author" = authors,
-    "keywords" = keywords,
-    "abstract" = AbstractText(records),
-    "author_country" = country,
-    "title" = ArticleTitle(records),
-    "pages" = MedlinePgn(records),
-    "issue" = Issue(records),
-    "volume" = Volume(records),
-    "year" = YearPubmed(records),
-    "pmid" = PMID(records),
-    "doi" = DOI(records),
-    "issn" = ISSN(records),
-    "journal" = MedlineTA(records)
-  )
+  })
 
   # Format dataframe for SOLES
   if (format_soles == TRUE) {
     pubmed_results <- pubmed_results %>%
-      # Change factors to characters
-      dplyr::mutate_if(is.factor, as.character) %>%
-      # reate URL column
-      dplyr::mutate(
-        url = paste0(
-          "https://www.ncbi.nlm.nih.gov/pubmed/",
-          .data$pmid
-        ),
-        source = "pubmed",
-        # reate unique identifier
-        uid = paste0(.data$source, "-", .data$pmid),
         # Format search date as character in format DDMMYY
-        date = format(Sys.Date(), "%d%m%y")
-      ) %>%
+        dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$pmid))
   }
