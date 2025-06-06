@@ -332,10 +332,10 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   pubmed_summary <- RISmed::summary(pubmed_search)
 
   # Try running search query using RISmed R package
-  pubmed_records <- tryCatch(
+  pubmed_results <- tryCatch(
     {
       # Try getting results
-      records <- RISmed::EUtilsGet(pubmed_search)
+      pubmed_results <- RISmed::EUtilsGet(pubmed_search)
     },
     error = function(e) {
       # Print error message and exit if error occurred
