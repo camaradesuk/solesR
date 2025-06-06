@@ -357,8 +357,8 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   # Format dataframe for SOLES
   if (format_soles == TRUE) {
     pubmed_results <- pubmed_results %>%
-        # Format search date as character in format DDMMYY
-        dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
+      # Format search date as character in format DDMMYY
+      dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$pmid))
   }
