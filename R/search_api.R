@@ -176,7 +176,7 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     },
     error = function(e) {
       # Print error message and exit if error occurred
-      stop("Error in calling scopusAPI::wos_search()", conditionMessage(e))
+      stop("Error in calling rwoslite::wos_search()", conditionMessage(e))
     }
   )
 
