@@ -637,3 +637,78 @@ create_regex <- function(file = ""){
   message(paste0("File named: ", new_file_name))
 
 }
+
+#' Remove HTML tags from text
+#' 
+#' A function that can be used to remove HTML tags from titles and abstracts
+#'
+#' @param string The input text for formatting
+#' 
+#' @return This function returns the formatted input string, with HTML tags removed.
+#'
+#' @details Currently, only basic text formatting tags are identified and removed. See: https://www.w3schools.com/html/html_formatting.asp
+#'
+#'
+#' @examples
+#' \dontrun{
+#' # Example usage:
+#' df %>% mutate(across(c(title, abstract), ~ rm_html_tags(.)))
+#' }
+#'
+#' @export
+#' 
+
+rm_html_tags <- function(string) {
+  
+  pattern <- "<\\/?i>|<\\/?su(p|b)>|<\\/?bold>|<\\/?b>|<\\/?em>|<\\/?mark>|
+  <\\/?small>|<\\/?del>|<\\/?in(s|f)>"
+  
+  try(string_nohtml <- gsub(pattern, "", string, ignore.case = T))
+  
+  if(is.null(string_nohtml))
+    return(string)
+  
+  else if(!is.null(string_nohtml))
+    return(string_nohtml)
+}
+
+#' Format title and abstract character strings
+#' 
+#' This function performs various formatting operations on the title and abstract columns of a SOLES dataframe. These include: removal of leading and trailing whitespace, removal of double backslashes, 
+#' replacement of 2+ spaces with single space and removal of leading characters (en dash, em dash, hyphen, colon, dot).
+#'
+#' @param df The SOLES dataframe to be formatted (e.g., `unique_citations` or `retrieved_citations`)
+#' 
+#' @return This function returns the formatted dataframe
+#'
+#'
+#' @importFrom stringr str_replace_all fixed
+#' @importFrom dplyr mutate
+#'
+#' @examples
+#' \dontrun{
+#' # Example usage:
+#' df %>% format_tiab()
+#' }
+#'
+#' @export
+#' 
+
+format_tiab <- function(df) {
+  
+  try(
+    df <- df %>% 
+      # removes leading/trailing whitespace 
+      mutate(across(c(title, abstract), ~trimws(., "both"))) %>%
+      # removes leading dashes and other characters, including when preceded or followed by a space
+      mutate(across(c(title, abstract), ~trimws(., "left", whitespace = "\\s?(\\.|\\:|\\-|\\—|\\–|\\-)\\s?"))) %>%
+      # replaces multiple spaces with a single space and replaces the phrase 'textbackslash' if present with a space
+      mutate(across(c(title, abstract), ~stringr::str_replace_all(., "\\s+|[Tt]extbackslash", " "))) %>% 
+      # removes occurrences of \\n
+      mutate(across(c(title, abstract), ~stringr::str_replace_all(., stringr::fixed("\\\\n"), ""))) %>% 
+      # removes occurrences of double backslashes
+      mutate(across(c(title, abstract), ~stringr::str_replace_all(., stringr::fixed("\\\\"), "")))
+  )
+  
+  return(df)
+}
