@@ -626,4 +626,120 @@ check_pico <- function(con) {
   unlink("temp", recursive = TRUE)
 }
 
-
+#' Create Regular Expressions
+#'
+#' This function reads a file containing names and their corresponding alternate names,
+#' then creates regular expressions based on these names and alternate names.
+#'
+#' @param file Path to the input Excel file.
+#'
+#' @return A new Excel file with additional columns containing regular expressions.
+#'
+#' @import readxl
+#' @import dplyr
+#' @importFrom openxlsx write.xlsx
+#'
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Example usage:
+#' create_regex("input_file.xlsx")
+#' }
+#'
+create_regex <- function(file = ""){
+  
+  # Read in file
+  file_for_regex <- read.xlsx(file)
+  
+  # Splits the df in to 2, no_alternate_names and with_alternate_names
+  no_alternate_names <- file_for_regex %>%
+    filter(is.na(alternate_names) | alternate_names == "")
+  
+  # Function to create a regex from the "name" column
+  name_to_regex <- function(string) {
+    
+    # Split the sentence into words
+    words <- strsplit(string, "\\s")[[1]]
+    
+    # Initialize a vector to store transformed patterns
+    transformed_patterns <- character(length = length(words))
+    
+    # Escape any punctuation characters in the words
+    words <- gsub("([[:punct:]])", "\\\\\\1", words)
+    
+    # Iterate over each word
+    for (i in seq_along(words)) {
+      
+      # Check if the word starts with [a-z] (case-insensitive)
+      if (grepl("^[[:alpha:]]", words[i], ignore.case = TRUE)) {
+        
+        # Apply pattern transformation with word boundaries at both start and end
+        pattern <- paste0("[", toupper(substr(words[i], 1, 1)), tolower(substr(words[i], 1, 1)), "]", substr(words[i], 2, nchar(words[i])))
+        
+      } else {
+        
+        # If the word doesn't start with [a-z], keep it as it is
+        pattern <- words[i]
+        
+      }
+      
+      # Store the transformed pattern
+      transformed_patterns[i] <- pattern
+      
+    }
+    
+    # Combine transformed patterns into a single string
+    collapsed_pattern <- paste(transformed_patterns, collapse = "[\\s-]*")
+    
+    # Add word boundaries if the collapsed pattern starts with alphabetic character
+    if (grepl("^\\[[[:alpha:]]", collapsed_pattern, ignore.case = TRUE)) {
+      result <- paste0("\\b", collapsed_pattern, "\\b")
+    } else {
+      result <- collapsed_pattern
+    }
+    
+    return(result)
+    
+  }
+  
+  # Apply the name_to_regex function to each name in 'no_alternate_names'
+  no_alternate_names$regex <- sapply(no_alternate_names$name, name_to_regex)
+  
+  # Create a df that does have alternate names
+  with_alternate_names <- file_for_regex %>%
+    filter(!(is.na(alternate_names) | alternate_names == ""))
+  
+  # Apply the name_to_regex function to each name in 'with_alternate_names'
+  with_alternate_names$name_regex <- sapply(with_alternate_names$name, name_to_regex)
+  
+  # Second function to convert alternate_names to regex and collapse on "|"
+  convert_alternate_names <- function(names, separate_names_by = "\\|") {
+    
+    split_strings <- strsplit(names, separate_names_by)[[1]]
+    remove_ws <- trimws(split_strings)
+    words <- sapply(remove_ws, name_to_regex)
+    join_words <- paste(words, collapse = "|")
+    
+    return(join_words)
+  }
+  
+  # Apply convert_alternate_names function to the alternate names
+  with_alternate_names$regex_alternate_names <- sapply(with_alternate_names$alternate_names, convert_alternate_names)
+  
+  # Concatenates the "name_regex" and "regex_alternate_names" in to 1, separated by "|"
+  with_alternate_names$regex <- apply(with_alternate_names[, c("name_regex", "regex_alternate_names")], 1, function(x) paste(x, collapse = "|"))
+  
+  # Binds the 2 sections back together, no_alternate_names and with_alternate_names
+  file_with_regex <- with_alternate_names %>%
+    select(name, type, main_category, sub_category1, sub_category2, alternate_names, regex) %>%
+    rbind(no_alternate_names)
+  
+  # Create a new file name
+  new_file_name <- paste0("updated_regex_", file)
+  write.xlsx(file_with_regex, new_file_name)
+  
+  message(paste0("File updated with regex and written to working directory"))
+  message(paste0("File named: ", new_file_name))
+  
+}
