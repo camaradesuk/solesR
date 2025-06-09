@@ -541,7 +541,7 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 #' @export
 
 
-check_pico <- function(con) {
+check_pico <- function(con, master_node) {
 
   # clean temp dir
   if(!dir.exists("temp")) {
@@ -554,7 +554,7 @@ check_pico <- function(con) {
 
   # get latest pico tables from OSF
 
-  osfr::osf_retrieve_node("7wc2a") %>%
+  osfr::osf_retrieve_node(master_node) %>%
     osfr::osf_ls_files() %>%
     osfr::osf_download("temp")
 
