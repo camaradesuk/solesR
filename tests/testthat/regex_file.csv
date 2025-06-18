@@ -1,0 +1,426 @@
+V1,name,regex,main_category,type,sub_category1,sub_category2
+1,2-choice  guessing  task,2\s*-?\s*choice\s*guessing\s*([Tt]ask|[Tt]est|[Aa]ssay|[Ee]xperiment)|2-?CSGT,Behaviour,outcome,NA,NA
+2,2-choice swim tank,2\s*-?\s*choice\s*swim\s*tank,Behaviour,outcome,NA,NA
+3,3-choice serial reaction time test (3CSRTT),3\s*-?\s*choice\s*serial\s*reaction\s*time\s*([Tt]est|[Aa]ssay|[Ee]xperiment)\s*(\(3-?CSRTT\))?|3-?CSRTT,Behaviour,outcome,NA,NA
+4,5-choice Continuous Performance Test (5C-CPT),5\s*-?\s*choice\s*Continuous\s*Performance\s*([Tt]est|[Aa]ssay|[Ee]xperiment)\s*(\(5C-?CPT\))?|5C-?CPT,Behaviour,outcome,NA,NA
+5,5-choice serial reaction time (5-CSRT) task,5\s*-?\s*choice\s*serial\s*reaction\s*time\s*([Tt]est|[Aa]ssay|[Ee]xperiment)\s*(\(5-?CSRT\))?|5-?CSRT,Behaviour,outcome,NA,NA
+6,6-arm Radial Tunnel Maze,6\s*-?\s*arm\s*Radial\s*Tunnel\s*Maze,Behaviour,outcome,NA,NA
+7,A-X Continuous Performance Test (A-X CPT),A\s*-?\s*X\s*Continuous\s*Performance\s*([Tt]est|[Tt]ask|[Aa]ssay)\s*(\(A\s*-?\s*X\s*-?CPT\))?|A\s*-?\s*X\s*CPT,Behaviour,outcome,NA,NA
+8,Acoustic startle response,[Aa]coustic\s*[Ss]tartle\s*[Rr]esponse,Behaviour,outcome,NA,NA
+9,Active Allothetic Place Avoidance Task,[Aa]ctive\s*[Aa]llothetic\s*[Pp]lace\s*[Aa]voidance\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+10,Active Avoidance conditioning,[Aa]ctive\s*[Aa]voidance\s*[Cc]onditioning,Behaviour,outcome,NA,NA
+11,Active Place Avoidance,[Aa]ctive\s*[Pp]lace\s*[Aa]voidance,Behaviour,outcome,NA,NA
+12,Acute Pain Sensitivity,[Aa]cute\s*[Pp]ain\s*[Ss]ensitivity,NA,outcome,NA,NA
+13,Aggression,[Aa]ggression,Behaviour,outcome,NA,NA
+14,Agitation,[Aa]gitation,Behaviour,outcome,NA,NA
+15,Alcove Test,[Aa]lcove\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+16,Amino acid levels,[Aa]mino\s*[Aa]cid\s*[Ll]evels,Behaviour,outcome,NA,NA
+17,Amphetamine-Induced Activity,[Aa]mphetamine-\s*[Ii]nduced\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+18,Antisaccade task,[Aa]ntisaccade\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+19,APO-knawing / Apomorphine-induced knawing,(APO-\s*|[Aa]pomorphine\s*-?[Ii]nduced\s*)[Kk]nawing,Behaviour,outcome,NA,NA
+20,Arousal,[Aa]rousal,Behaviour,outcome,NA,NA
+21,Associative learning test,[Aa]ssociative\s*[Ll]earning\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+22,Ataxia,[Aa]taxia,Behaviour,outcome,NA,NA
+23,Attachment behaviour,[Aa]ttachment\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+24,Attention-set-shifting task,[Aa]ttention\s*-?set\s*-?shifting\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+25,Attentional task performance,[Aa]ttentional\s*([Tt]ask|[Tt]est|[Aa]ssay)\s*[Pp]erformance,Behaviour,outcome,NA,NA
+26,Auditory evoked response,[Aa]uditory\s*-?[Ee]voked\s*-?[Rr]esponse,Behaviour,outcome,NA,NA
+27,Auditory sensory gating,[Aa]uditory\s*-?[Ss]ensory\s*-?[Gg]ating,Behaviour,outcome,NA,NA
+28,Autoshaping,[Aa]utoshaping,Behaviour,outcome,NA,NA
+29,Aversion tests,[Aa]version\s*([Tt]ests?|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+30,Avoidance tests,[Aa]voidance\s*([Tt]ests?|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+31,Back Pedalling Behaviour,[Bb]ack\s*[Pp]edalling\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+32,Barnes Maze Test,[Bb]arnes\s*[Mm]aze\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+33,Beam walking,[Bb]eam\s*[Ww]alking,Behaviour,outcome,NA,NA
+34,Behavioural Pattern Monitor,[Bb]ehavioural\s*[Pp]attern\s*[Mm]onitor,Behaviour,outcome,NA,NA
+35,Bimanual Motor Skill task,[Bb]imanual\s*[Mm]otor\s*[Ss]kill\s*([Tt]ask|[Tt]est|[Aa]ssay)\s*,Behaviour,outcome,NA,NA
+36,Black-white alley paradigm,[Bb]lack(-|\s)?[Ww]hite\s*([Aa]lley)?\s*(paradigm|test|assay),Behaviour,outcome,NA,NA
+37,Blocking paradigm,[Bb]locking\s*[Pp]aradigm,Behaviour,outcome,NA,NA
+38,Body weight gain,[Bb]ody\s*[Ww]eight\s*[Gg]ain,Metabolic,outcome,NA,NA
+39,Boissier Exploration Test,[Bb]oissier\s*[Ee]xploration\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+40,Bradykinesia,[Bb]radykinesia,Behaviour,outcome,NA,NA
+41,Brain stimulation reward,[Bb]rain\s*[Ss]timulation\s*[Rr]eward,Behaviour,outcome,NA,NA
+42,Brightness Discrimination,[Bb]rightness\s*[Dd]iscrimination,Behaviour,outcome,NA,NA
+43,c-fos expression,[cC]-[Ff]os\s*[Ee]xpression,NA,outcome,NA,NA
+44,c-fos immunoreactivity/immunostaining/immunohistochemistry/immunofluorescence,[cC]-[Ff]os\s*([Ii]mmunoreactivity|[Ii]mmunostaining|[Ii]mmunohistochemistry|[Ii]mmunofluorescence),Neurochemical,outcome,NA,NA
+45,c-fos immunocytochemistry,[cC]-[fF]os\s*[Ii]mmunocytochemistry,Neurochemical,outcome,NA,NA
+46,c-fos in-situ hybridisation,[cC]-[fF]os\s*[Ii]n-situ\s*[Hh]ybridisation,NA,outcome,NA,NA
+47,c-fos immunoprecipitation,[cC]-[fF]os\s*[Ii]mmunoprecipitation,NA,outcome,NA,NA
+48,c-fos western blotting,[cC]-[fF]os\s*[Ww]estern\s*[Bb]lotting,NA,outcome,NA,NA
+49,c-fos protein immunoblotting,[cC]-[fF]os\s*[Pp]rotein\s*[Ii]mmunoblotting,NA,outcome,NA,NA
+50,c-fos Enzyme-Linked Immunosorbent Assay (ELISA),[cC]-[fF]os\s*[Ee]nzyme-[Ll]inked\s*[Ii]mmunosorbent\s*[Aa]ssay\s*\([Ee]LISA\)?|[cC]-[fF]os\s*[Ee]LISA,NA,outcome,NA,NA
+51,c-fos Fluorescence Activated Cell Sorting (FACS),[cC]-[fF]os\s*[Ff]luorescence\s*[Aa]ctivated\s*[Cc]ell\s*[Ss]orting\s*\([Ff]ACS\)?|[cC]-[fF]os\s*[Ff]ACS,Neurochemical,outcome,NA,NA
+52,Cambridge Neuropsychological Test Automated Battery spatial working memory test (CANTAB SWM),[Cc]ambridge\s*[Nn]europsychological\s*[Tt]est\s*[Aa]utomated\s*[Bb]attery\s*(?:[Ss]patial\s*[Ww]orking\s*[Mm]emory)\s*(?:(?:[Tt]est|[Aa]ssay|[Ee]xperiment)?)?\s*\([Cc]ANTAB\s*-?[Ss]WM\)?|[Cc]ANTAB\s*-?([Ss]WM)?,Behaviour,outcome,NA,NA
+53,Can Test,[Cc]an\s*[Tt]est,Behaviour,outcome,NA,NA
+54,Catalepsy,[Cc]atalepsy,Behaviour,outcome,NA,NA
+55,Catatonia,[Cc]atatonia,Behaviour,outcome,NA,NA
+56,Checking Test,[Cc]hecking\s*([Bb]ehaviour|[Aa]ssay|[Tt]est|[Mm]onitoring),Behaviour,outcome,NA,NA
+57,Chimney test (climbing backwards up a tube),[Cc]himney\s*-?[Tt]est,Behaviour,outcome,NA,NA
+58,Cincinnati Water Maze,[Cc]incinnati\s*[Ww]ater\s*[Mm]aze,Behaviour,outcome,NA,NA
+59,Circling behaviour,[Cc]ircling\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+60,Cliff Avoidance,[Cc]liff\s*[Aa]voidance,Behaviour,outcome,NA,NA
+61,Climbing activity,[Cc]limbing\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+62,Coat-hanger test,[Cc]oat\s*-?[Hh]anger\s*[Tt]est,Behaviour,outcome,NA,NA
+63,Cocaine self-administration,[Cc]ocaine\s*[Ss]elf-?\s*[Aa]dministration,Behaviour,outcome,NA,NA
+64,Combined attention-memory task,[Cc]ombined\s*[Aa]ttention-memory\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+65,Conditional Discrimination task,[Cc]onditional\s*[Dd]iscrimination\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+66,Conditioned avoidance response,[Cc]onditioned\s*[Aa]voidance\s*[Rr]esponse,Behaviour,outcome,NA,NA
+67,Conditioned Emotional Response Paradigm,[Cc]onditioned\s*[Ee]motional\s*[Rr]esponse\s*([Pp]aradigm|[Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+68,Conditioned lick suppression procedure,[Cc]onditioned\s*[Ll]ick\s*[Ss]uppression\s*[Pp]rocedure,Behaviour,outcome,NA,NA
+69,Conditioned olfactory aversion,[Cc]onditioned\s*[Oo]lfactory\s*[Aa]version,Behaviour,outcome,NA,NA
+70,Conditioned place aversion,[Cc]onditioned\s*[Pp]lace\s*[Aa]version,Behaviour,outcome,NA,NA
+71,Conditioned place preference,[Cc]onditioned\s*[Pp]lace\s*[Pp]reference,Behaviour,outcome,NA,NA
+72,Conditioned reinforcement,[Cc]onditioned\s*[Rr]einforcement,Behaviour,outcome,NA,NA
+73,Conditioned Reward Test,[Cc]onditioned\s*([Rr]eward|[Ee]ffort)\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+74,Conditioned Taste Aversion,[Cc]onditioned\s*[Tt]aste\s*[Aa]version,Behaviour,outcome,NA,NA
+75,Contextual control of response conflict,[Cc]ontextual\s*[Cc]ontrol\s*of\s*[Rr]esponse\s*[Cc]onflict,Behaviour,outcome,NA,NA
+76,Contextual Fear Conditioning,[Cc]ontextual\s*[Ff]ear\s*[Cc]onditioning,Behaviour,outcome,NA,NA
+77,Contextual Freezing Experiment,[Cc]ontextual\s*[Ff]reezing\s*[Ee]xperiment,Behaviour,outcome,NA,NA
+78,Continuous Delayed alternation,[Cc]ontinuous\s*[Dd]elayed\s*[Aa]lternation,Behaviour,outcome,NA,NA
+79,Continuous Performance test,[Cc]ontinuous\s*[Pp]erformance\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+80,Continuous reinforcement task,[Cc]ontinuous\s*[Rr]einforcement\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+81,Continuous spatial alternation T-maze task,[Cc]ontinuous\s*[Ss]patial\s*[Aa]lternation\s*[Tt]\s*-?maze\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+82,Conveyor belt task,[Cc]onveyor\s*[Bb]elt\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+83,Convulsions (in NZ rabbits),[Cc]onvulsions,Behaviour,outcome,NA,NA
+84,Corneal areflexia,[Cc]orneal\s*[Aa]reflexia,Behaviour,outcome,NA,NA
+85,Cost-benefit T-maze task,[Cc]ost-benefit\s*[Tt]\s*-?maze\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+86,Crawley’s three-chamber social approach test,[Cc]rawley’s\s*(three|3)-chamber\s*[Ss]ocial\s*[Aa]pproach\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+87,Cross Maze,[Cc]ross\s+([Mm]aze|[Tt]est|[Ee]xperiment),Behaviour,outcome,NA,NA
+88,Cue-induced reinstatement,[Cc]ue-?\s*[Ii]nduced\s*[Rr]einstatement,Behaviour,outcome,NA,NA
+89,Defensive flight reaction in response to a novel stimulus,[Dd]efensive\s*[Ff]light\s*[Rr]eaction\s*in\s*response\s*to\s*a\s*novel\s*[Ss]timulus,Behaviour,outcome,NA,NA
+90,Delayed Alternation Task,[Dd]elayed\s*[Aa]lternation\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+91,Delayed eyeblink conditioning paradigm,[Dd]elayed\s*[Ee]yeblink\s*[Cc]onditioning\s*paradigm,Behaviour,outcome,NA,NA
+92,Delayed Match to Sample (DMTS),[Dd]elayed\s*[Mm]atch\s*to\s*[Ss]ample\s*\(DMTS\)|\bDMTS\b,Behaviour,outcome,NA,NA
+93,Delayed Matching to Position Task,[Dd]elayed\s*[Mm]atching\s*to\s*([Pp]osition|[Pp]lace)\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+94,Delayed Non-Match-To-Position/Sample,[Dd]elayed\s*[Nn]on-?\s*[Mm]atch-?\s*[Tt]o-?\s*([Pp]osition|[Ss]ample),Behaviour,outcome,NA,NA
+95,Delayed spatial win-shift (SWSh) task,[Dd]elayed\s*[Ss]patial\s*[Ww]in-[Ss]hift\s*(\(SWSh\))?\s*([Tt]ask|[Tt]est|[Aa]ssay)|[Ss]WSh,Behaviour,outcome,NA,NA
+96,Detrended Fluctuation Analysis,[Dd]etrended\s*[Ff]luctuation\s*[Aa]nalysis,Behaviour,outcome,NA,NA
+97,Differential Reinforcement of Low Rate of Responding,[Dd]ifferential\s*[Rr]einforcement\s*of\s*[Ll]ow\s*[Rr]ate\s*of\s*[Rr]esponding,Behaviour,outcome,NA,NA
+98,Discrete Paired-trial Variable-delay Task,[Dd]iscrete\s*[Pp]aired-[Tt]rial\s*[Vv]ariable-[Dd]elay\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+99,Discrimination learning test,[Dd]iscrimination\s*[Ll]earning\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+100,Discrimination Reversal Learning,[Dd]iscrimination\s*[Rr]eversal\s*[Ll]earning,Behaviour,outcome,NA,NA
+101,Diving Behaviour Task,[Dd]iving\s*[Bb]ehaviour\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+102,Dopamine transporter function,[Dd]opamine\s*[Tt]ransporter\s*[Ff]unction,Neurochemical,outcome,NA,NA
+103,Dot pattern expectancy task,[Dd]ot\s*-?[Pp]attern\s*[Ee]xpectancy\s*([Tt]ask|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+104,Double-H maze test,[Dd]ouble\s*-?[Hh]\s*-?maze\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+105,Drowsiness,[Dd]rowsiness,Behaviour,outcome,NA,NA
+106,Drug discrimination,[Dd]rug\s*[Dd]iscrimination,Behaviour,outcome,NA,NA
+107,Drug self-administration,[Dd]rug\s*[Ss]elf\s*-?[Aa]dministration,Behaviour,outcome,NA,NA
+108,Dystonia,[Dd]ystonia,Behaviour,outcome,NA,NA
+109,Ear-scratch response (ESR),[Ee]ar-scratch\s*[Rr]esponse\s*(\(ESR\))?|\b[Ee]SR\b,Behaviour,outcome,NA,NA
+110,Electroencephalogram (EEG),[Ee]lectroencephalogram\s*(\(EEG\))?|\b[Ee]EG\b,Behaviour,outcome,NA,NA
+111,Effort-related Choice Procedure,[Ee]ffort-related\s*[Cc]hoice\s*[Pp]rocedure,Behaviour,outcome,NA,NA
+112,Electrical stimulation of the tail root (EST),[Ee]lectrical\s*[Ss]timulation\s*of\s*the\s*[Tt]ail\s*[Rr]oot\s*(\(EST\))?|\b[Ee]ST\b,Behaviour,outcome,NA,NA
+113,Elevated platform test,[Ee]levated\s*[Pp]latform\s*([Tt]est|[Aa]ssay|[Ee]xperiment|[Tt]ask),Behaviour,outcome,NA,NA
+114,Elevated plus maze (EPM),[Ee]levated\s*[Pp]lus\s*[Mm]aze\s*\(EPM\)?,Behaviour,outcome,NA,NA
+115,Elevated T-maze,[Ee]levated\s*T\s*-?[Mm]aze,Behaviour,outcome,NA,NA
+116,Elevated Y-maze,[Ee]levated\s*Y\s*-?[Mm]aze,Behaviour,outcome,NA,NA
+117,Elevated-Zero maze,[Ee]levated\s*-?\s*[Zz]ero\s*[Mm]aze,Behaviour,outcome,NA,NA
+118,Emergence Test,[Ee]mergence\s*[Tt]est,Behaviour,outcome,NA,NA
+119,Escape behaviour,[Ee]scape\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+120,Excess repetition,[Ee]xcess\s*[Rr]epetition,Behaviour,outcome,NA,NA
+121,Exploratory Activity,[Ee]xploratory\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+122,Extradimensional-intradimensional (ED/ID) test,[Ee]xtradimensional-[Ii]ntradimensional\s*(\([Ee][Dd]\/[Ii][Dd]\))?\s*([Tt]est|[Aa]ssay|[Ee]xperiment)|\b[Ee][Dd]\/[Ii][Dd]\b,Behaviour,outcome,NA,NA
+123,Eye movements (optokinetic reflex in mice),[Ee]ye\s*[Mm]ovements,Behaviour,outcome,NA,NA
+124,Eye movements (zebrafish),[Ee]ye\s*[Mm]ovements,Behaviour,outcome,NA,NA
+125,Eye opening,[Ee]ye\s*[Oo]pening,Behaviour,outcome,NA,NA
+126,Eye-blink rate,[Ee]ye-?\s*[Bb]link\s*[Rr]ate,Behaviour,outcome,NA,NA
+127,Falling,[Ff]alling,Behaviour,outcome,NA,NA
+128,Fear conditioning,[Ff]ear\s+([Cc]ondition(ed|ing)?|[Tt]raining|[Ii]nduction),Behaviour,outcome,NA,NA
+129,Fear Potentiated Startle,[Ff]ear\s+([Pp]otentiated|[Ee]nhanced)\s*([Ss]tartle|[Rr]eflex),Behaviour,outcome,NA,NA
+130,Fearful reaction,[Ff]earful\s*[Rr]eaction,Behaviour,outcome,NA,NA
+131,Feeding behaviour,[Ff]eeding\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+132,Female urine sniffing test,[Ff]emale\s*[Uu]rine\s*[Ss]niffing\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+133,Fighting behaviour,[Ff]ighting\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+134,Fixed  ratio/fixed  interval  schedule  of  food  reinforcement,[Ff]ixed\s*([Rr]atio|[Ii]nterval)\s*[Ss]chedule\s*of\s*[Ff]ood\s*([Rr]einforcement|[Aa]dministration),Behaviour,outcome,NA,NA
+135,Fixed consecutive number schedule reinforcement,[Ff]ixed\s*[Cc]onsecutive\s*[Nn]umber\s*[Ss]chedule\s*[Rr]einforcement,Behaviour,outcome,NA,NA
+136,Fixed ratio-switch procedure,[Ff]ixed\s*[Rr]atio-?\s*[Ss]witch\s*[Pp]rocedure,Behaviour,outcome,NA,NA
+137,Food Hoarding Test,[Ff]ood\s*[Hh]oarding\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+138,Food Preference Test,[Ff]ood\s*[Pp]reference\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+139,Food presentation test,[Ff]ood\s*[Pp]resentation\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+140,Food-induced place conditioning,[Ff]ood-?\s*[Ii]nduced\s*[Pp]lace\s*[Cc]onditioning,Behaviour,outcome,NA,NA
+141,Food-rewarded operant FR30 drug discrimination task,[Ff]ood-?\s*[Rr]ewarded\s*[Oo]perant\s*(FR30\s*)?[Dd]rug\s*-?[Dd]iscrimination\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+142,Footprint analysis,[Ff]ootprint\s*[Aa]nalysis,Behaviour,outcome,NA,NA
+143,Footshock procedures,[Ff]ootshock\s*[Pp]rocedures,Behaviour,outcome,NA,NA
+144,Footshock sensitivity,[Ff]ootshock\s*[Ss]ensitivity,Behaviour,outcome,NA,NA
+145,Forced alternation task,[Ff]orced\s*[Aa]lternation\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+146,Forced-swim test,[Ff]orced-[Ss]wim\s*([Tt]est|[Aa]ssay|[Ee]xperiment)|\bFST\b,Behaviour,outcome,NA,NA
+147,Forelimb Grasp,[Ff]orelimb\s*[Gg]rasp,Behaviour,outcome,NA,NA
+148,Forepaw Treading Behaviour,[Ff]orepaw\s*-?[Tt]reading\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+149,Formalin test,[Ff]ormalin\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+150,Free food paradism,[Ff]ree\s*-?[Ff]ood\s*[Pp]aradism,Behaviour,outcome,NA,NA
+151,Gastrointestinal function,[Gg]astrointestinal\s*-?[Ff]unction,Behaviour,outcome,NA,NA
+152,Geller Seifter test,[Gg]eller\s*-?\s*[Ss]eifter\s*[Tt]est,Behaviour,outcome,NA,NA
+153,General activity,[Gg]eneral\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+154,Gnawing,[Gg]nawing,Behaviour,outcome,NA,NA
+155,Grip Strength,[Gg]rip\s*[Ss]trength,Behaviour,outcome,NA,NA
+156,Gross motor behaviours,[Gg]ross\s*[Mm]otor\s*[Bb]ehaviours,Behaviour,outcome,NA,NA
+157,Gustometer Test/ Licking Response,[Gg]ustometer\s*([Tt]est|[Aa]ssay|[Ee]xperiment)\s*|\s*[Ll]icking\s*[Rr]esponse,Behaviour,outcome,NA,NA
+158,H-maze for rule learning,[Hh]\s*-?[Mm]aze(\s*for\s*[Rr]ule\s*[Ll]earning)?,Behaviour,outcome,NA,NA
+159,Habituation to Confinement,[Hh]abituation\s*-?to\s*-?[Cc]onfinement,Behaviour,outcome,NA,NA
+160,Hallucinatory-like behavior,[Hh]allucinatory-like\s*[Bb]ehavior,Behaviour,outcome,NA,NA
+161,Hang Wire,[Hh]ang\s*[Ww]ire,Behaviour,outcome,NA,NA
+162,Head twitch response (HTR),[Hh]ead\s*[Tt]witch\s*[Rr]esponse\s*(\(HTR\))?|\bHTR\b,Behaviour,outcome,NA,NA
+163,Head Weaving,[Hh]ead\s*[Ww]eaving,Behaviour,outcome,NA,NA
+164,Heart rate,[Hh]eart\s*[Rr]ate|\bHR\b,Cardiovascular,outcome,NA,NA
+165,Heroin self-administration,[Hh]eroin\s*[Ss]elf-[Aa]dministration,Behaviour,outcome,NA,NA
+166,Hexagonal Tunnel Maze,[Hh]exagonal\s*-?[Tt]unnel\s*[Mm]aze,Behaviour,outcome,NA,NA
+167,Hidden food test,[Hh]idden\s*[Ff]ood\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+168,Hole Board Test,[Hh]ole\s*[Bb]oard\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+169,Homing Board,[Hh]oming\s*[Bb]oard,Behaviour,outcome,NA,NA
+170,Hopping movements,[Hh]opping\s*[Mm]ovements,Behaviour,outcome,NA,NA
+171,Hot-plate response,[Hh]ot-?\s*[Pp]late\s*[Rr]esponse,Behaviour,outcome,NA,NA
+172,Hyperactivity,[Hh]yperactivity,Behaviour,outcome,NA,NA
+173,Hyponeophagia task,[Hh]yponeophagia\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+174,Immobility reflex,[Ii]mmobility\s*[Rr]eflex,Behaviour,outcome,NA,NA
+175,Immobility tests,[Ii]mmobility\s*([Tt]ests?|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+176,Locomotor Inactivity,[Ll]ocomotor\s*[Ii]nactivity,Behaviour,outcome,NA,NA
+177,Inclined Plane,[Ii]nclined\s*[Pp]lane,Behaviour,outcome,NA,NA
+178,Incremental electroconvulsive shock procedure (IECS),[Ii]ncremental\s*[Ee]lectroconvulsive\s*[Ss]hock\s*[Pp]rocedure\s*(\([Ii][Ee][Cc][Ss]\))?|\bIECS\b,Behaviour,outcome,NA,NA
+179,Incubation of cocaine craving,[Ii]ncubation\s*of\s*[Cc]ocaine\s*[Cc]raving,Behaviour,outcome,NA,NA
+180,Inhibitory Avoidance,[Ii]nhibitory\s*[Aa]voidance,Behaviour,outcome,NA,NA
+181,Inhibitory control/Impulsivity,[Ii]nhibitory\s*[Cc]ontrol|[Ii]mpulsivity,Behaviour,outcome,NA,NA
+182,Instrumental Learning and Extinction,[Ii]nstrumental\s*[Ll]earning\s*and\s*[Ee]xtinction,Behaviour,outcome,NA,NA
+183,Instrumental Responding/Conditioning,[Ii]nstrumental\s*[Rr]esponding|[Cc]onditioning,Behaviour,outcome,NA,NA
+184,Interchangeable Maze,[Ii]nterchangeable\s*-?[Mm]aze,Behaviour,outcome,NA,NA
+185,Intracranial self-stimulation (ICSS),[Ii]ntracranial\s*self-stimulation\s*(\(ICSS\))?|\bICSS\b,Behaviour,outcome,NA,NA
+186,Intruder-evoked aggressive test,[Ii]ntruder-evoked\s*[Aa]ggressive\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+187,Irritability,[Ii]rritability,Behaviour,outcome,NA,NA
+188,Jumping,[Jj]umping,Behaviour,outcome,NA,NA
+189,L-maze rewarded approach,[Ll]-?\s*[Mm]aze\s*[Rr]ewarded\s*[Aa]pproach,Behaviour,outcome,NA,NA
+190,Lashley III Maze,[Ll]ashley\s*(III|3)\s*[Mm]aze,Behaviour,outcome,NA,NA
+191,Latent inhibition,[Ll]atent\s*[Ii]nhibition,Behaviour,outcome,NA,NA
+192,Lateralised reaction time task,[Ll]ateralised\s*[Rr]eaction\s*time\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+193,Leaning (i.e. against a wall),[Ll]eaning,Behaviour,outcome,NA,NA
+194,Licking,[Ll]icking,Behaviour,outcome,NA,NA
+195,Light-dark test,[Ll]ight\s*-?\s*[Dd]ark\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+196,Limb flick,[Ll]imb\s*[Ff]lick,Behaviour,outcome,NA,NA
+197,Limb jerks,[Ll]imb\s*[Jj]erks,Behaviour,outcome,NA,NA
+198,Linear maze task,[Ll]inear\s*[Mm]aze\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+199,Locomotor activity,[Ll]ocomotor\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+200,Locomotor coordination,[Ll]ocomotor\s*[Cc]oordination,Behaviour,outcome,NA,NA
+201,Loss of righting reflex test (LORR),[Ll]oss\s*of\s*[Rr]ighting\s*[Rr]eflex\s*([Tt]est|[Aa]ssay|[Ee]xperiment)\s*(\(LORR\))?|\bLORR\b,Behaviour,outcome,NA,NA
+202,Marble burying test,[Mm]arble\s*[Bb]urying\s*([Tt]est|[Tt]ask|[Aa]ssay|[Bb]ehaviour),Behaviour,outcome,NA,NA
+203,Match-to-position maze,[Mm]atch-?\s*to-?\s*[Pp]osition\s*[Mm]aze,Behaviour,outcome,NA,NA
+204,Match-to-sample,[Mm]atch-?\s*to-?\s*[Ss]ample,Behaviour,outcome,NA,NA
+205,Maternal Behaviour,[Mm]aternal\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+206,Maximal electroshock test,[Mm]aximal\s*[Ee]lectroshock\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+207,Maze pattern learning,[Mm]aze\s*[Pp]attern\s*[Ll]earning,Behaviour,outcome,NA,NA
+208,Mean arterial blood pressure (MAP),[Mm]ean\s*[Aa]rterial\s*[Bb]lood\s*[Pp]ressure\s*(\(MAP)\)?|\bMAP\b,Cardiovascular,outcome,NA,NA
+209,Mirror stimulation test,[Mm]irror\s*[Ss]timulation\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+210,Mixed signalled-unsignalled DRL procedure,[Mm]ixed\s*[Ss]ignalled-[Uu]nsignalled\s*DRL\s*[Pp]rocedure,Behaviour,outcome,NA,NA
+211,Modified Hole Board (mHB),[Mm]odified\s*[Hh]ole\s*[Bb]oard\s*\(([Mm][Hh][Bb]\))?|\b[Mm]HB\b,Behaviour,outcome,NA,NA
+212,Modified Irwin Neurological Battery,[Mm]odified-?\s*[Ii]rwin\s*[Nn]eurological-?\s*[Bb]attery,Behaviour,outcome,NA,NA
+213,Morris Water Maze,[Mm]orris-?\s*[Ww]ater-?\s*[Mm]aze|\bMWM\b,Behaviour,outcome,NA,NA
+214,Mother Preference,[Mm]other\s*-?[Pp]reference,Behaviour,outcome,NA,NA
+215,Mother-goal-maze,[Mm]other-?\s*[Gg]oal-?\s*[Mm]aze,Behaviour,outcome,NA,NA
+216,Motor coordination tests,[Mm]otor\s*-?[Cc]oordination\s*([Tt]ests?|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+217,Motor Impairment,[Mm]otor\s*[Ii]mpairment,Behaviour,outcome,NA,NA
+218,Motor monitor,[Mm]otor\s*[Mm]onitor,Behaviour,outcome,NA,NA
+219,Mouthing,\b[Mm]outhing\b,Behaviour,outcome,NA,NA
+220,Multiple Repeated Learning and Performance,[Mm]ultiple\s*-?[Rr]epeated\s*-?[Ll]earning\s*-?and\s*-?[Pp]erformance,Behaviour,outcome,NA,NA
+221,Multivariate Concentric Square Field,[Mm]ultivariate\s*-?[Cc]oncentric\s*[Ss]quare\s*-?[Ff]ield,Behaviour,outcome,NA,NA
+222,n-back task,[nN]-[Bb]ack\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+223,Natural reward-conditioned learning,[Nn]atural\s*[Rr]eward-[Cc]onditioned\s*[Ll]earning,Behaviour,outcome,NA,NA
+224,Negative geotactic reaction,[Nn]egative\s*[Gg]eotactic\s*[Rr]eaction,Behaviour,outcome,NA,NA
+225,Negative patterning task,[Nn]egative\s*[Pp]atterning\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+226,Neophobia paradigm,[Nn]eophobia\s*[Pp]aradigm,Behaviour,outcome,NA,NA
+227,Nest building test,[Nn]est\s*-?[Bb]uilding\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+228,Nesting Behaviour,[Nn]esting\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+229,Neuronal size/density/morphology,[Nn]euronal\s*([Ss]ize|[Dd]ensity|[Mm]orphology),Behaviour,outcome,NA,NA
+230,Neurotransmitter concentration/expression/release,[Nn]eurotransmitter\s*([Cc]oncentration|[Ee]xpression|[Rr]elease),Behaviour,outcome,NA,NA
+231,Nociceptive test,[Nn]ociceptive\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+232,Non-delayed random foraging task,[Nn]on-?\s*[Dd]elayed\s*[Rr]andom\s*[Ff]oraging\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+233,Novel arena-induced locomotor activity,[Nn]ovel\s*[Aa]rena-?\s*[Ii]nduced\s*[Ll]ocomotor\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+234,Novel Discrimination Learning,[Nn]ovel\s*[Dd]iscrimination\s*[Ll]earning,Behaviour,outcome,NA,NA
+235,Novel environment habituation,[Nn]ovel\s*-?[Ee]nvironment\s*[Hh]abituation,Behaviour,outcome,NA,NA
+236,Novel Object Exploration Test/Novel Object Approach,[Nn]ovel\s*-?[Oo]bject\s*([Ee]xploration\s*([Tt]est|[Tt]ask|[Aa]ssay)|[Aa]pproach),Behaviour,outcome,NA,NA
+237,Novel Object Recognition Test,[Nn]ovel\s*-?[Oo]bject\s*[Rr]ecognition\s*([Tt]est|[Tt]ask|[Aa]ssay)|\bNOR\b,Behaviour,outcome,NA,NA
+238,Novel tank (fish),[Nn]ovel\s*-?[Tt]ank,Behaviour,outcome,NA,NA
+239,Novel water maze,[Nn]ovel\s*-?[Ww]ater\s*-?[Mm]aze,Behaviour,outcome,NA,NA
+240,Novelty Seeking Test,[Nn]ovelty\s*[Ss]eeking\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+241,Novelty Suppressed Feeding Test,[Nn]ovelty\s*[Ss]uppressed\s*[Ff]eeding\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+242,Oasis maze,[Oo]asis\s*[Mm]aze,Behaviour,outcome,NA,NA
+243,Object association with a temporal discontiguity,[Oo]bject\s*-?[Aa]ssociation\s*[Ww]ith\s*[Aa]\s*[Tt]emporal\s*[Dd]iscontiguity,Behaviour,outcome,NA,NA
+244,Object Exploration Test,[Oo]bject\s*[Ee]xploration\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+245,Object location test,[Oo]bject\s*[Ll]ocation\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+246,Object Order Memory,[Oo]bject\s*[Oo]rder\s*[Mm]emory,Behaviour,outcome,NA,NA
+247,Object Retrieval/Detour Task,[Oo]bject\s*[Rr]etrieval|[Dd]etour\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+248,Object-in-context recognition task,[Oo]bject-?\s*in-?\s*[Cc]ontext\s*[Rr]ecognition\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+249,Object/Place recognition test,[Oo]bject|[Pp]lace\s*[Rr]ecognition\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+250,Odour discrimination,[Oo]dour\s*-?[Dd]iscrimination,Behaviour,outcome,NA,NA
+251,Odour sequence memory,[Oo]dour\s*-?[Ss]equence\s*[Mm]emory,Behaviour,outcome,NA,NA
+252,Odour Span Task,[Oo]dour\s*-?[Ss]pan\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+253,Odour-Stroke Associative Learning,[Oo]dour-[Ss]troke\s*[Aa]ssociative\s*[Ll]earning,Behaviour,outcome,NA,NA
+254,Olfactory foraging task,[Oo]lfactory\s*[Ff]oraging\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+255,Olfactory habituation task,[Oo]lfactory\s*[Hh]abituation\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+256,Olfactory Tubing Maze,[Oo]lfactory\s*[Tt]ubing\s*[Mm]aze,Behaviour,outcome,NA,NA
+257,Open Field Activity/Task,[Oo]pen\s*[Ff]ield\s*([Tt]est|[Tt]ask|[Aa]ssay|[Aa]ctivity),Behaviour,outcome,NA,NA
+258,Open Field Defence-Withdrawal test,[Oo]pen\s*[Ff]ield\s*[Dd]efence-[Ww]ithdrawal\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+259,Open Field Exploration Task,[Oo]pen\s*[Ff]ield\s*[Ee]xploration\s*([Tt]est|[Tt]ask|[Aa]ssay),Behaviour,outcome,NA,NA
+260,Open Field Morris Water Maze,[Oo]pen\s*[Ff]ield\s*([Mm]orris\s*[Ww]ater\s*[Mm]aze|\bMWM\b),Behaviour,outcome,NA,NA
+261,Open Field object recognition task,[Oo]pen\s*[Ff]ield\s*[Oo]bject\s*[Rr]ecognition\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+262,Operant conditioning,[Oo]perant\s*-?[Cc]onditioning,Behaviour,outcome,NA,NA
+263,Orienting,[Oo]rienting,Behaviour,outcome,NA,NA
+264,Orofacial Dyskinesia,[Oo]rofacial\s*[Dd]yskinesia,Behaviour,outcome,NA,NA
+265,Paddle pool test,[Pp]addle\s*-?[Pp]ool\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+266,Partial Avoidance,[Pp]artial\s*[Aa]voidance,Behaviour,outcome,NA,NA
+267,Passive Avoidance,[Pp]assive\s*[Aa]voidance,Behaviour,outcome,NA,NA
+268,Paw Preference  Test,[Pp]aw\s*[Pp]reference\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+269,Paw Pressure,[Pp]aw\s*[Pp]ressure,Behaviour,outcome,NA,NA
+270,Peak-interval timing procedure,[Pp]eak-interval\s*[Tt]iming\s*[Pp]rocedure,Behaviour,outcome,NA,NA
+271,Place escape avoidance paradigm,[Pp]lace\s*[Ee]scape\s*[Aa]voidance\s*[Pp]aradigm,Behaviour,outcome,NA,NA
+272,Plantar test,[Pp]lantar\s*([Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+273,Plasma THC level,[Pp]lasma\s*THC\s*([Ll]evel),Neurochemical,outcome,NA,NA
+274,Play Behaviour,[Pp]lay\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+275,Pole Climbing Test,[Pp]ole\s*[Cc]limbing\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+276,Popping behaviour,[Pp]opping\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+277,Porsolt test,[Pp]orsolt\s*-?([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+278,Pre-Pulse Inhibition (PPI),[Pp]re-[Pp]ulse\s*[Ii]nhibition\s*(\(PPI\))?|PPI,Behaviour,outcome,NA,NA
+279,Predator attraction,[Pp]redator\s*[Aa]ttraction,Behaviour,outcome,NA,NA
+280,Predatory danger avoidance,[Pp]redatory\s*[Dd]anger\s*[Aa]voidance,Behaviour,outcome,NA,NA
+281,Probabilistic Learning Task,[Pp]robabilistic\s*-?[Ll]earning\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+282,Progressive-ratio breakpoint,[Pp]rogressive-[Rr]atio\s*[Bb]reakpoint,Behaviour,outcome,NA,NA
+283,Progressive-Ratio schedule of reinforcement,[Pp]rogressive-[Rr]atio\s*[Ss]chedule\s*of\s*[Rr]einforcement,Behaviour,outcome,NA,NA
+284,Psychosis-like behaviour,[Pp]sychosis-like\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+285,Pup retrieving test,[Pp]up\s*[Rr]etrieving\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+286,Pupillary response,[Pp]upillary\s*[Rr]esponse,Behaviour,outcome,NA,NA
+287,Pushing backwards behaviour,[Pp]ushing\s*-?[Bb]ackwards\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+288,Puzzle box,[Pp]uzzle\s*[Bb]ox,Behaviour,outcome,NA,NA
+289,Quinine consumption,[Qq]uinine\s*[Cc]onsumption,Behaviour,outcome,NA,NA
+290,Radial Arm Maze,[Rr]adial\s*[Aa]rm\s*[Mm]aze,Behaviour,outcome,NA,NA
+291,Radial Water Maze,[Rr]adial\s*[Ww]ater\s*[Mm]aze,Behaviour,outcome,NA,NA
+292,Random reinforcement procedure,[Rr]andom\s*[Rr]einforcement\s*[Pp]rocedure,Behaviour,outcome,NA,NA
+293,Ranking of behavioural activity,[Rr]anking\s*of\s*[Bb]ehavioural\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+294,Ratio discrimination tasks,[Rr]atio\s*[Dd]iscrimination\s*([Tt]asks?|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+295,Reactivity to environmental stimuli,[Rr]eactivity\s*to\s*[Ee]nvironmental\s*[Ss]timuli,Behaviour,outcome,NA,NA
+296,Rearing,[Rr]earing,Behaviour,outcome,NA,NA
+297,Reinforcer Devaluation Paradigm,[Rr]einforcer\s*-?[Dd]evaluation\s*[Pp]aradigm,Behaviour,outcome,NA,NA
+298,Repeated Acquisition Paradigm,[Rr]epeated\s*-?[Aa]cquisition\s*[Pp]aradigm,Behaviour,outcome,NA,NA
+299,Representation-Mediated Taste Aversion,[Rr]epresentation-?\s*[Mm]ediated\s*[Tt]aste\s*[Aa]version,Behaviour,outcome,NA,NA
+300,Resident-Intruder Assay,([Rr]esident-?\s*[Ii]ntruder|territorial\sinvasion)\s*([Aa]ssay|[Tt]est|[Ee]xperiment),Behaviour,outcome,NA,NA
+301,Reversal-learning task,[Rr]eversal\s*-?[Ll]earning\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+302,Reward-discounting choice task,[Rr]eward-?\s*[Dd]iscounting\s*[Cc]hoice\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+303,Reward-seeking behaviour,[Rr]eward-?\s*[Ss]eeking\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+304,Rewarded Alternation,[Rr]ewarded\s*[Aa]lternation,Behaviour,outcome,NA,NA
+305,Rodent gambling task,[Rr]odent\s*[Gg]ambling\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+306,Rope Climbing,[Rr]ope\s*[Cc]limbing,Behaviour,outcome,NA,NA
+307,Rotarod test,[Rr]otarod\s*[Tt]est,Behaviour,outcome,NA,NA
+308,Rotating Turntable Task,[Rr]otating\s*[Tt]urntable\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+309,Rotational behaviour,[Rr]otational\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+310,Runway task,[Rr]unway\s*[Tt]ask,Behaviour,outcome,NA,NA
+311,Saccharine-Water Choice test,[Ss]accharine-?\s*[Ww]ater\s*[Cc]hoice\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+312,Salivation,[Ss]alivation,Behaviour,outcome,NA,NA
+313,Scanning,[Ss]canning,Behaviour,outcome,NA,NA
+314,Schedule-induced polydipsia (SIP),[Ss]chedule-induced\s*[Pp]olydipsia\s*(\(SIP\))?|\bSIP\b,Behaviour,outcome,NA,NA
+315,Scrabbling,[Ss]crabbling,Behaviour,outcome,NA,NA
+316,Scratching,[Ss]cratching,Behaviour,outcome,NA,NA
+317,Sedation,[Ss]edation,Behaviour,outcome,NA,NA
+318,Self-ordered spatial search (SOSS),[Ss]elf-ordered\s*[Ss]patial\s*[Ss]earch\s*(\(SOSS\))?|\bSOSS\b,Behaviour,outcome,NA,NA
+319,Sensorimotor coordination,[Ss]ensorimotor\s*[Cc]oordination,Behaviour,outcome,NA,NA
+320,Sensory Inhibition,[Ss]ensory\s*[Ii]nhibition,Behaviour,outcome,NA,NA
+321,P20–N40 EEG paradigm,[Pp]20–[Nn]40\s*EEG\s*[Pp]aradigm,Behaviour,outcome,NA,NA
+322,Sensory-specific satiety,[Ss]ensory-?\s*[Ss]pecific\s*[Ss]atiety,Behaviour,outcome,NA,NA
+323,Serotonin behavioural syndrome,[Ss]erotonin\s*[Bb]ehavioural\s*[Ss]yndrome,Behaviour,outcome,NA,NA
+324,Serotonin transporter function,[Ss]erotonin\s*[Tt]ransporter\s*[Ff]unction,Behaviour,outcome,NA,NA
+325,Set-Shift Task,[Ss]et-[Ss]hift\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+326,Shaking (wet-dog shake),[Ss]haking,Behaviour,outcome,NA,NA
+327,Shoaling,[Ss]hoaling,Behaviour,outcome,NA,NA
+328,Shock paired contextual conditioning,[Ss]hock\s*-?[Pp]aired\s*[Cc]ontextual\s*[Cc]onditioning,Behaviour,outcome,NA,NA
+329,Shock-probe burying,[Ss]hock-?\s*[Pp]robe\s*[Bb]urying,Behaviour,outcome,NA,NA
+330,Shuttlebox avoidance,[Ss]huttlebox\s*-?[Aa]voidance,Behaviour,outcome,NA,NA
+331,Sidman's avoidance procedure,[Ss]idman('s)?\s*[Aa]voidance\s*([Pp]rocedure|[Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+332,Sifting,[Ss]ifting,Behaviour,outcome,NA,NA
+333,Simple Reaction Time Test,[Ss]imple\s*[Rr]eaction\s*[Tt]ime\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+334,Sleep-wake pattern,[Ss]leep-?\s*[Ww]ake\s*[Pp]attern,Behaviour,outcome,NA,NA
+335,Sleeping time,[Ss]leeping\s*[Tt]ime,Behaviour,outcome,NA,NA
+336,Social  transmission  of  food  preference  task,[Ss]ocial\s*[Tt]ransmission\s*of\s*[Ff]ood\s*[Pp]reference\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+337,Social Acoustic Memory,[Ss]ocial\s*[Aa]coustic\s*[Mm]emory,Behaviour,outcome,NA,NA
+338,Social affiliation,[Ss]ocial\s*[Aa]ffiliation,Behaviour,outcome,NA,NA
+339,Social Approach-Avoidance Task,[Ss]ocial\s*[Aa]pproach-?\s*[Aa]voidance\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+340,Social Behaviour,[Ss]ocial\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+341,Social choice paradigm,[Ss]ocial\s*[Cc]hoice\s*([Pp]aradigm|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+342,Social Dominance Tube Test,[Ss]ocial\s*[Dd]ominance\s*[Tt]ube\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+343,Social interaction,[Ss]ocial\s*[Ii]nteraction,Behaviour,outcome,NA,NA
+344,Social Novelty Discrimination Procedure,[Ss]ocial\s*[Nn]ovelty\s*([Dd]iscrimination|[Pp]reference)\s*([Pp]rocedure|[Pp]rocess),Behaviour,outcome,NA,NA
+345,Social odor recognition assay,[Ss]ocial\s*[Oo]dor\s*[Rr]ecognition\s*([Aa]ssay|[Tt]est),Behaviour,outcome,NA,NA
+346,Social Play Behaviour,[Ss]ocial\s*[Pp]lay\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+347,Social preference test,[Ss]ocial\s*[Pp]reference\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+348,Social Recognition Test,[Ss]ocial\s*[Rr]ecognition\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+349,Socio-sexual interaction,[Ss]ocio-?\s*[Ss]exual\s*[Ii]nteraction,Behaviour,outcome,NA,NA
+350,Spacial Recognition Memory,[Ss]pa(c|t)ial\s*[Rr]ecognition\s*[Mm]emory,Behaviour,outcome,NA,NA
+351,Spatial delayed alternation,[Ss]patial\s*[Dd]elayed\s*[Aa]lternation,Behaviour,outcome,NA,NA
+352,Spatial Delayed Response (SDR),[Ss]patial\s*[Dd]elayed\s*[Rr]esponse\s*(\(SDR\))?|\bSDR\b,Behaviour,outcome,NA,NA
+353,Spatial delayed win-shift task (SDWSh),[Ss]patial\s*delayed\s*win[-]?shift\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est)\s*(\((SDWSh)\))?|\bSDWSh\b,Behaviour,outcome,NA,NA
+354,Spatial food rewarded task,[Ss]patial\s*[Ff]ood\s*[Rr]ewarded\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+355,Spatial learning memory,[Ss]patial\s*[Ll]earning\s*[Mm]emory,Behaviour,outcome,NA,NA
+356,Spatial Learning Olfactory-guided Test,[Ss]patial\s*[Ll]earning\s*[Oo]lfactory-?\s*[Gg]uided\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+357,Spatial Novelty Preference,[Ss]patial\s*[Nn]ovelty\s*[Pp]reference,Behaviour,outcome,NA,NA
+358,Spatial pattern separation test,[Ss]patial\s*-?[Pp]attern\s*-?[Ss]eparation\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+359,Spatial shift task,[Ss]patial\s*-?[Ss]hift\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+360,Spontaneous Alternation,[Ss]pontaneous\s*[Aa]lternation,Behaviour,outcome,NA,NA
+361,Spontaneous Motor activity,[Ss]pontaneous\s*-?[Mm]otor\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+362,Spontaneous spatial novelty preference,[Ss]pontaneous\s*-?[Ss]patial\s*[Nn]ovelty\s*[Pp]reference,Behaviour,outcome,NA,NA
+363,Staring,[Ss]taring,Behaviour,outcome,NA,NA
+364,Startle behaviour,[Ss]tartle\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+365,Startle Habituation,[Ss]tartle\s*[Hh]abituation,Behaviour,outcome,NA,NA
+366,Startle response/Magnitude/Amplitude,[Ss]tartle\s*([Rr]esponse|[Mm]agnitude|[Aa]mplitude),Behaviour,outcome,NA,NA
+367,Stationary activity,[Ss]tationary\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+368,Steady state operant procedure,[Ss]teady\s*-?[Ss]tate\s*[Oo]perant\s*([Pp]rocedure|[Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+369,Step-through passive avoidance test,[Ss]tep-?\s*through\s*[Pp]assive\s*-?[Aa]voidance\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+370,Stereotyped behaviour,[Ss]tereotyped\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+371,Stereotyped grooming,[Ss]tereotyped\s*[Gg]rooming,Behaviour,outcome,NA,NA
+372,Stereotyped sniffing,[Ss]tereotyped\s*[Ss]niffing,Behaviour,outcome,NA,NA
+373,Stimulus control,[Ss]timulus\s*[Cc]ontrol,Behaviour,outcome,NA,NA
+374,Straight Channel Swimming,[Ss]traight\s*[Cc]hannel\s*[Ss]wimming,Behaviour,outcome,NA,NA
+375,Straight runway task,[Ss]traight\s*[Rr]unway\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+376,Straub Tail response,[Ss]traub\s*([Tt]ail)?\s*([Rr]esponse|[Rr]eaction|[Rr]eflex),Behaviour,outcome,NA,NA
+377,Successive alleys,[Ss]uccessive\s*[Aa]lleys,Behaviour,outcome,NA,NA
+378,Sucrose Preference Test,([Ss]ucrose|[Ss]accharin)\s*([Pp]reference)\s*([Tt]est|[Aa]ssay|[Ee]xperiment)?,Behaviour,outcome,NA,NA
+379,Sudden Silence Test,[Ss]udden\s*[Ss]ilence\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+380,Sustained Attention task,[Ss]ustained\s*[Aa]ttention\s*([Tt]ask|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+381,Swim Tank,[Ss]wim\s*[Tt]ank,Behaviour,outcome,NA,NA
+382,Swimming Y-maze,[Ss]wimming\s*[Yy]-?\s*maze,Behaviour,outcome,NA,NA
+383,Syringe puzzle,[Ss]yringe\s*[Pp]uzzle,Behaviour,outcome,NA,NA
+384,T-maze test,[Tt]-maze\s*(([Tt]est|[Aa]ssay|[Ee]xperiment))?,Behaviour,outcome,NA,NA
+385,Tail flick response,[Tt]ail\s*[Ff]lick\s*[Rr]esponse,Behaviour,outcome,NA,NA
+386,Tail suspension test,[Tt]ail\s*[Ss]uspension\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+387,Tail withdrawal test,[Tt]ail\s*[Ww]ithdrawal\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+388,Tank diving behavioural test,[Tt]ank\s*[Dd]iving\s*[Bb]ehavioural\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+389,Task-switching paradigm,[Tt]ask-[Ss]witching\s*([Pp]aradigm|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+390,Taste-Reactivity Test,[Tt]aste-[Rr]eactivity\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+391,Body temperature,[Bb]ody\s*[Tt]emperature,Behaviour,outcome,NA,NA
+392,The  Complex  Maze,[Tt]he\s*[Cc]omplex\s*[Mm]aze,Behaviour,outcome,NA,NA
+393,Thigmotaxis Test,[Tt]higmotaxis\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+394,Third Order Markov Model,([Tt]hird|3rd)\s*-?[Oo]rder\s*[Mm]arkov\s*[Mm]odel,Behaviour,outcome,NA,NA
+395,Three Chamber Social Test,([Tt]hree|3)-?\s*[Cc]hamber\s*[Ss]ocial\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+396,Three-panel runway task,([Tt]hree|3)-panel\s*[Rr]unway\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+397,Touch sensitive apparatus,[Tt]ouch\s*[Ss]ensitive\s*[Aa]pparatus,Behaviour,outcome,NA,NA
+398,Rapid visual orienting sequence,[Rr]apid\s*[Vv]isual\s*-?[Oo]rienting\s*[Ss]equence,Behaviour,outcome,NA,NA
+399,Transitive inference task (odour discrimination),[Tt]ransitive\s*[Ii]nference\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+400,Turning,[Tt]urning,Behaviour,outcome,NA,NA
+401,Two-choice discrete-trial avoidance paradigm,([Tt]wo|2)-choice\s*[Dd]iscrete-trial\s*[Aa]voidance\s*([Pp]aradigm|[Tt]est|[Aa]ssay),Behaviour,outcome,NA,NA
+402,Two-choice swim tank,([Tt]wo|2)-choice\s*[Ss]wim\s*[Tt]ank,Behaviour,outcome,NA,NA
+403,Two-choice Visual Discrimination Test,([Tt]wo|2)-choice\s*[Vv]isual\s*[Dd]iscrimination\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+404,Two-way (shuttle) avoidance-conditioning task,([Tt]wo|2)-way\s*(\([Ss]huttle\))?\s*avoidance-conditioning\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+405,Two-way Active Avoidance,([Tt]wo|2)-way\s*[Aa]ctive\s*[Aa]voidance,Behaviour,outcome,NA,NA
+406,Ultrasonic Vocalization,[Uu]ltrasonic\s*[Vv]ocalization,Behaviour,outcome,NA,NA
+407,Unrest,[Uu]nrest,Behaviour,outcome,NA,NA
+408,Visual motor response test,[Vv]isual\s*[Mm]otor\s*[Rr]esponse\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+409,Visual Pattern Discrimination,[Vv]isual\s*[Pp]attern\s*[Dd]iscrimination,Behaviour,outcome,NA,NA
+410,Visual Signal Detection Task,[Vv]isual\s*[Ss]ignal\s*[Dd]etection\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+411,Visually guided Saccade/Antisaccade task,[Vv]isually\s*[Gg]uided\s*[Ss]accade/[Aa]ntisaccade\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+412,Visuo-spatial Paired Associates Learning (vsPAL),[Vv]isuo-[Ss]patial\s*[Pp]aired\s*[Aa]ssociates\s*[Ll]earning\s*\([Vv][Ss][Pp][Aa][Ll]\)|[Vv][Ss][Pp][Aa][Ll],Behaviour,outcome,NA,NA
+413,Vocalisations in response to Isolation,[Vv]ocalisations\s*in\s*response\s*to\s*[Ii]solation,Behaviour,outcome,NA,NA
+414,Vogel Conflict Test,[Vv]ogel\s*[Cc]onflict\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+415,Voluntary Sucrose Consumption,[Vv]oluntary\s*[Ss]ucrose\s*[Cc]onsumption,Behaviour,outcome,NA,NA
+416,Von Frey test,[Vv]on\s*[Ff]rey\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+417,Walking Backwards behaviour,[Ww]alking\s*[Bb]ackwards\s*[Bb]ehaviour,Behaviour,outcome,NA,NA
+418,Water consumption,[Ww]ater\s*[Cc]onsumption,Behaviour,outcome,NA,NA
+419,Water Finding Test,[Ww]ater\s*[Ff]inding\s*([Tt]est|[Aa]ssay|[Ee]xperiment),Behaviour,outcome,NA,NA
+420,Water T-maze,[Ww]ater\s*[Tt]-maze,Behaviour,outcome,NA,NA
+421,Water-labyrinth learning,[Ww]ater-[Ll]abyrinth\s*[Ll]earning,Behaviour,outcome,NA,NA
+422,Wheel activity,[Ww]heel\s*[Aa]ctivity,Behaviour,outcome,NA,NA
+423,Win-shift task,[Ww]in-shift\s*([Tt]ask|[Aa]ssay|[Ee]xperiment|[Tt]est),Behaviour,outcome,NA,NA
+424,Y-maze test,Y-?\s*[Mm]aze-?\s*[Tt]est,Behaviour,outcome,NA,NA
+425,Yawning,[Yy]awning,Behaviour,outcome,NA,NA

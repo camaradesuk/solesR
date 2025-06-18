@@ -72,7 +72,7 @@ Imports:
     httr,
     jsonlite
 VignetteBuilder: knitr
-Remotes:  
+Remotes: 
     kaitlynhair/RISmed,
     kaitlynhair/rwos,
     kaitlynhair/scopusAPI,
@@ -83,3 +83,4 @@ Remotes:
 Depends: 
     R (>= 2.10),
     bibliometrix
+Config/testthat/edition: 3
