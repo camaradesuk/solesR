@@ -284,30 +284,41 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
   try_grepl <- function(pattern, name) {
     tryCatch(grepl(pattern, name, ignore.case = T, perl = T), error = function(err) NA)
   }
+  
+  try_detect <- function(name, pattern) {
+    tryCatch(stringr::str_detect(name, pattern), error = function(err) NA)
+  }
+  
+  correct_regex_nostr <- correct_regex %>% 
+    mutate(str_check = try_detect(name, regex)) %>% 
+    filter(is.na(str_check))
+  
+  correct_regex_str <- correct_regex %>% 
+    mutate(str_check = try_detect(name, regex)) %>% 
+    filter(!is.na(str_check))
 
   message("Checking for duplicates in new RegEx...")
 
   ontology_names <- unique(pico_o$name)
-
-  matched <- pico_o %>%
-    rename(area = id) %>%
-    left_join(pico_d, by = c("regex_id" = "id"), relationship = "many-to-many") %>%
-    mutate(match = grepl(pattern = paste(correct_regex$regex, collapse = '|'), x = name)) %>%
-    select(name, match, type, regex_id, regex, area) %>%
+  
+  matched <- pico_o %>% 
+    # rename(area = id) %>% 
+    left_join(pico_d, by = c("regex_id" = "id"), relationship = "many-to-many") %>% 
+    mutate(match = grepl(pattern = paste(correct_regex$regex, collapse = '|'), x = name)) %>% 
+    select(name, match, type, regex_id, regex) %>% 
     rename(type_ont = type,
            name_ont = name,
            id_ont = regex_id,
-           regex_ont = regex,
-           area_ont = area) %>%
+           regex_ont = regex) %>% 
     filter(match %in% TRUE)
 
-  regex_match <- matched %>%
-    fuzzyjoin::regex_right_join(correct_regex, by = c(name_ont = "regex")) %>%
-    rowwise() %>%
+  regex_match_str <- matched %>% 
+    fuzzyjoin::regex_right_join(correct_regex_str, by = c(name_ont = "regex")) %>% 
+    rowwise() %>% 
     mutate(match_type = case_when(type_ont != type  ~ FALSE,
-                                  type_ont == type  ~ TRUE)) %>%
-    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>%
-    ungroup() %>%
+                                  type_ont == type  ~ TRUE)) %>% 
+    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>% 
+    ungroup() %>% 
     mutate(
       is_likely_new = case_when(
         is.na(match) ~ TRUE,
@@ -318,8 +329,30 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
                          is_likely_new %in% TRUE & match_concept %in% TRUE & match_type %in% FALSE ~ TRUE,
                          is_likely_new %in% TRUE & match_concept %in% FALSE ~ TRUE,
                          is_likely_new %in% FALSE ~ FALSE)
-      ) %>%
-    filter(!is.na(name))
+    ) %>% 
+    filter(!is.na(name)) 
+  
+  regex_match_nostr <- correct_regex_nostr %>% 
+    fuzzyjoin::regex_left_join(matched, by = c("regex" = "name_ont")) %>% 
+    rowwise() %>% 
+    mutate(match_type = case_when(type_ont != type  ~ FALSE,
+                                  type_ont == type  ~ TRUE)) %>% 
+    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>% 
+    ungroup() %>% 
+    mutate(
+      is_likely_new = case_when(
+        is.na(match) ~ TRUE,
+        match %in% TRUE & match_type %in% FALSE ~ TRUE,
+        match %in% TRUE & match_type %in% TRUE ~ FALSE),
+      is_new = case_when(is.na(match) ~ TRUE,
+                         is_likely_new %in% TRUE & match_concept %in% TRUE & match_type %in% TRUE ~ FALSE,
+                         is_likely_new %in% TRUE & match_concept %in% TRUE & match_type %in% FALSE ~ TRUE,
+                         is_likely_new %in% TRUE & match_concept %in% FALSE ~ TRUE,
+                         is_likely_new %in% FALSE ~ FALSE)
+    ) %>% 
+    filter(!is.na(name)) 
+  
+  regex_match <- rbind(regex_match_str, regex_match_nostr)
 
   # retain only new regexes
   message("Removing RegEx that already exist in the soles database...")
@@ -384,18 +417,16 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
       slice_tail() %>%
       pull(id)
 
-    pico_new <- new_regex %>%
-      ungroup() %>%
-      mutate(id = seq(from = last_existing_id + 1, length.out = nrow(.))) %>%
-      mutate(area = NA)
+    pico_new <- new_regex %>% 
+      ungroup() %>% 
+      mutate(id = seq(from = last_existing_id + 1, length.out = nrow(.)))
 
     pico_d_new <- pico_new %>%
       select(id, regex)
 
-    pico_o_new <- pico_new %>%
-      rename(regex_id = id,
-             id = area) %>%
-      select(name, regex_id, type, main_category, sub_category1, sub_category2, id)
+    pico_o_new <- pico_new %>% 
+      rename(regex_id = id) %>%
+      select(name, regex_id, type, main_category, sub_category1, sub_category2)
 
     # add regex for new Unknown type
 
@@ -410,19 +441,19 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
       slice_tail() %>%
       pull(id)
 
-    unknown_o_new <- new_types %>%
-      tibble::as_tibble_col(column_name = "type") %>%
+  
+    unknown_o_new <- new_types %>% 
+      tibble::as_tibble_col(column_name = "type") %>% 
       mutate(regex_id = seq(from = last_unknown_id + 1, length.out = nrow(.)),
              name = str_to_title(paste("Unknown", str_replace(type, "_", " "))),
              main_category = "Unknown",
              sub_category1 = "Unknown",
-             sub_category2 = "Unknown",
-             id = NA) %>%
-      select(name, regex_id, type, main_category, sub_category1, sub_category2, id)
-
-    unknown_d_new <- unknown_o_new %>%
-      mutate(regex = "") %>%
-      select(regex_id, regex) %>%
+             sub_category2 = "Unknown") %>% 
+      select(name, regex_id, type, main_category, sub_category1, sub_category2)
+    
+    unknown_d_new <- unknown_o_new %>% 
+      mutate(regex = "") %>% 
+      select(regex_id, regex) %>% 
       rename(id = regex_id)
 
     # Upload new files to OSF -------------------------------------------------
@@ -473,13 +504,13 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
         lapply(ont_split, function(x) write.csv(x,
                                                 paste0("temp/", paste("regex_ontology", x$type[1], entry_id, user_id, format(Sys.Date(), "%d%m%y"), sep = "_"), ".csv"),
                                                 row.names = FALSE))
-
+        
         dict_2split <- pico_o_new %>%
-          select(-id) %>%
-          left_join(pico_d_new, by = c("regex_id" = "id")) %>%
-          rename(id = regex_id) %>%
+          select(-id) %>% 
+          left_join(pico_d_new, by = c("regex_id" = "id")) %>% 
+          rename(id = regex_id) %>% 
           select(id, regex, type)
-
+        
         dict_split <- split(dict_2split, dict_2split$type)
 
         lapply(dict_split, function(x) write.csv(x %>% select(-type),
