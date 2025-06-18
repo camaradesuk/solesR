@@ -47,23 +47,27 @@ clean_regex_file <- function(regex_file) {
     select(-n)
 
   if(n_dup_names > 0) {
-
-    print(dup_names_tbl)
-    proceed_combineRegexes <- menu(c("Yes", "No"),
+    
+    # calling scope
+    tb <- .traceback(x = 0)
+    
+    # check if testthat or interactive
+    if(!any(unlist(lapply(tb, function(x) any(grepl("test_env", x))))) && interactive()) {
+      
+      print(dup_names_tbl)
+      
+      proceed_combineRegexes <- menu(c("Yes", "No"),
                                    title = message("Different RegEx that correspond to the same name/concept were found.
                                                    Should they be combined in one expression separated by an OR operator?"))
-
-    if (proceed_combineRegexes == "1") {
-      dat <- dat %>%
-        filter(!name %in% dup_names) %>%
-        bind_rows(correct_dup_names)
-
-    } else if(proceed_combineRegexes == "2") {
-
+      
+      if (proceed_combineRegexes == "1") {
+        
+        dat <- dat %>%
+          filter(!name %in% dup_names) %>%
+          bind_rows(correct_dup_names)
+        } 
+      }  
     }
-  } else {
-
-  }
 
 
   # find duplicate regex (different name) and optionally remove
@@ -79,19 +83,26 @@ clean_regex_file <- function(regex_file) {
   n_dup_regex <- length(unique(dup_regex_tbl$name))
 
   if(n_dup_regex > 0) {
-
-    print(dup_regex_tbl)
-
-    proceed_removeDupRegex <- menu(c("Yes", "No"),
+    
+    # calling scope
+    tb <- .traceback(x = 0)
+    
+    # check if called in testthat or interactive
+    if(!any(unlist(lapply(tb, function(x) any(grepl("test_env", x))))) && interactive()) {
+      
+      print(dup_regex_tbl)
+      
+      proceed_removeDupRegex <- menu(c("Yes", "No"),
                                    title = message("The above entries have duplicate RegEx that correspond to different names/concepts. Should duplicates be removed?
                                                Choosing 'Yes' will keep only the first occurrence of each duplicate RegEx"))
-
-    if (proceed_removeDupRegex == "1") {
-
-      dat <- dat %>%
-        group_by(type, regex, main_category, sub_category1, sub_category2) %>%
-        slice(1) %>%
-        ungroup()
+      
+      if (proceed_removeDupRegex == "1") {
+        
+        dat <- dat %>%
+          group_by(type, regex, main_category, sub_category1, sub_category2) %>%
+          slice(1) %>%
+          ungroup()
+      }
     }
   }
 
