@@ -268,12 +268,13 @@ yearBarServer_included_only <- function(id, table, column,
                   color = ~x,
                   hoverinfo = 'text',
                   textposition = "none",
-                  text = ~paste("<b>Info:</b> ", x,
-                                "<br><b>Number of Publications:</b>", n,
+                  text = ~paste("<br><b>Number of Publications:</b>", n,
                                 "<br><b>Year:</b>", year)) %>%
           layout(showlegend = FALSE,
                  yaxis = list(title = 'Number of publications'),
                  xaxis = list(title = "", tickangle = -45, ticklen = 4), barmode='stack',
+                 hoverlabel = list(bgcolor = "white", 
+                                   font = list(size = 14)),
                  annotations =
                    list(x = 1, y = -0.2, text = text,
                         showarrow = F, xref='paper', yref='paper',
@@ -411,17 +412,18 @@ pie_completion_Server <- function(id, table, identifier, included_studies, colou
           table$status <- "tagged"
           
           df_count <- included_studies %>%
-            left_join(table, by=identifier, multiple="all") %>%
+            left_join(table, by = identifier, multiple = "all") %>%
+            mutate(doi_final = if ("doi.x" %in% colnames(.)) doi.x else doi) %>%
             mutate(cat = ifelse(is.na(status), "Not Complete", "Complete")) %>%
-            mutate(cat = ifelse(doi == "", "Missing DOI", cat)) %>% 
+            mutate(cat = ifelse(doi_final == "" | is.na(doi_final), "Missing DOI", cat)) %>%
             select(identifier, cat) %>%
             group_by(cat) %>%
-            count() %>% 
-            ungroup() %>% 
+            count() %>%
+            ungroup() %>%
             mutate(colour = case_when(
               cat == "Complete" ~ colour_complete,
               cat == "Not Complete" ~ colour_not_complete,
-              TRUE ~ "#454545" 
+              TRUE ~ "#454545"
             ))
           
         } else {
@@ -552,7 +554,8 @@ pico_multi_select_UI <- function(id,
                                  column2,
                                  label1,
                                  label2,
-                                 title = "", 
+                                 title = "",
+                                 selected,
                                  theme,
                                  spinner_colour) {
   
@@ -569,8 +572,6 @@ pico_multi_select_UI <- function(id,
                     background-color: #efefef !important;
                     color: black !important;
                     }')),
-      
-      # tags$style(HTML(".js-irs-0 .irs-single, .js-irs-0 .irs-bar-edge, .js-irs-0 .irs-bar {background: green}")),
       
       pickerInput(
         inputId = ns("select_cat_picker"),
@@ -590,7 +591,7 @@ pico_multi_select_UI <- function(id,
           inputId = ns("select_type_picker"),
           label = label2,
           choices = sort(unique(column2)),
-          selected = sort(unique(column2)),
+          selected = selected,
           multiple = TRUE,
           options =  list(maxItems = 10,
                           virtualScroll = 100,
@@ -634,12 +635,15 @@ pico_multi_select_UI <- function(id,
         inputId = ns("select_cat_picker"),
         label = label1,
         choices = sort(unique(column)),
-        selected = sort(unique(column[!column %in% c("Unknown")])),
+        selected = selected,
         multiple = TRUE,
         options = pickerOptions(noneSelectedText = "Please Select",
                                 virtualScroll = 100,
                                 actionsBox = TRUE,
                                 size = 10,
+                                liveSearch = TRUE,
+                                maxOptions = 20
+                                
         )
       ),
       
@@ -772,6 +776,8 @@ pico_multi_select_Server  <- function(id,
                                selected = dynamic_updated_target_selection()[1:5])
           
         })
+        
+        
         
         observeEvent(input$select_type_picker, {
           
@@ -937,6 +943,12 @@ search_UI <- function(id, table) {
              value="basic_search_tab",
              title = "Basic search",
              
+             fluidRow(
+               column(3,
+                      tags$p("Conduct a search for relevant articles", style = "color: black !important;font-family: KohinoorBangla, Sans-serif;")
+                      %>% shinyhelper::helper(type = "markdown", content = "searching", size="l", inline=T),
+               )),
+             
              textAreaInput(
                inputId = ns("topic1"),
                label = "add keywords separated by commas:",
@@ -1077,10 +1089,10 @@ search_UI <- function(id, table) {
                      tooltip = tooltipOptions(title = "Click to filter studies"),
                      
                      actionBttn(inputId = ns("submit_filters"),
-                                label = "Apply filters"),
+                                label = "Apply filters")
                      
-                     prettySwitch(inputId = ns("highly_sensitive"),
-                                  label = "High sensitivity")
+                     # prettySwitch(inputId = ns("highly_sensitive"),
+                     #              label = "High sensitivity")
             )
         ),
         
@@ -1529,7 +1541,7 @@ search_Server <- function(id,
                                   title)) %>%
             select(uid, year, author, journal, title) %>%
             left_join(combined_pico_table, by="uid") %>%
-            distinct() 
+            distinct()
           
           selected_studies <- as.data.frame(selected_studies) %>%
             ungroup()
@@ -1554,13 +1566,15 @@ search_Server <- function(id,
               # Loop through each dataframe and filter
               new_table <- pico_table_list[[i]] %>%
                 filter(name %in% isolate(pico_element_list[[i]]())) %>%
-                select(uid) 
+                select(uid) %>% 
+                distinct()
               
               # Only keep the rows that have a matching "uid"
               selected_studies <- selected_studies %>%
                 semi_join(new_table, by = "uid")
             }
           }
+          
           
           # Use year slider to filter 
           selected_studies <- selected_studies %>%
@@ -1585,7 +1599,6 @@ search_Server <- function(id,
           arrange(desc(year))
         
         combined_pico_table <- unique(combined_pico_table)
-        
         selected_studies <- selected_studies %>%
           mutate(title = ifelse(!is.na(doi) & doi != "", 
                                 paste0("<a href='", link, "' target='_blank'>", title, "</a>"), 
@@ -1763,7 +1776,7 @@ search_Server <- function(id,
       search_results_download <- reactive({
         
         results <- citations_for_download %>%
-          filter(uid %in% !!filter_results()$uid) %>%
+          filter(uid %in% !!filter_results()$uid) %>% 
           mutate(abstract = "")
         
       })
@@ -1777,6 +1790,7 @@ search_Server <- function(id,
         rresults <- results %>%
           rename(Authors = author,
                  Title = title,
+                 Abstract = abstract,
                  Url = url,
                  Year = year,
                  DOI= doi,
@@ -1808,7 +1822,7 @@ search_Server <- function(id,
       # download refs button server side - endnote
       output$download_syrf <- downloadHandler(
         filename = function() {
-          paste0("citations-syrf-", Sys.Date(),
+          paste0("citations-srf-", Sys.Date(),
                  ".csv", sep="")
         },
         content = function(file) {
@@ -1831,7 +1845,7 @@ search_Server <- function(id,
                  "ISBN/ISSN" = isbn) %>%
           select("Reference Type", "author", "year",
                  "Secondary Title", "doi", "title",
-                 "pages", "volume", "number",
+                 "pages", "volume", "number", "abstract",
                  "Custom 1", "ISBN/ISSN") %>%
           mutate(abstract = "")
         
@@ -2295,15 +2309,16 @@ download_table_UI <- function(id) {
 #' This Shiny module server handles the server-side logic for downloading citation metadata
 #'
 #' @param id The module identifier.
-#' @param table 
+#' @param table The filtered table which the user wishes to download
+#' @param citations_for_dl All of the included studies and metadata
 #'
 #' @export
-download_table_Server <- function(id, table) {
+download_table_Server <- function(id, table, citations_for_dl) {
   moduleServer(
     id,
     function(input, output, session) {
-      ns <- NS(id)  
       
+      ns <- NS(id)  
       # Download citations sever side --------
       # download refs button server side -csv
       output$download_csv <- downloadHandler(
@@ -2320,7 +2335,9 @@ download_table_Server <- function(id, table) {
       search_results_download <- reactive({
         
         results <- citations_for_dl %>%
-          filter(uid %in% !!table$uid)
+          filter(uid %in% !!table$uid) %>% 
+          mutate(abstract = "")
+        
         
       })
       
@@ -2329,7 +2346,7 @@ download_table_Server <- function(id, table) {
         results <- citations_for_dl %>%
           filter(uid %in% !!table$uid)
         
-        rresults <- results %>%
+        results <- results %>%
           rename(Authors = author,
                  Title = title,
                  Abstract = abstract,
@@ -2363,7 +2380,7 @@ download_table_Server <- function(id, table) {
       # download refs button server side - endnote
       output$download_syrf <- downloadHandler(
         filename = function() {
-          paste0("citations-srf-", Sys.Date(),
+          paste0("citations-syrf-", Sys.Date(),
                  ".csv", sep="")
         },
         content = function(file) {
@@ -2386,9 +2403,9 @@ download_table_Server <- function(id, table) {
                  "ISBN/ISSN" = isbn) %>%
           select("Reference Type", "author", "year",
                  "Secondary Title", "doi", "title",
-                 "pages", "volume", "number", "abstract",
+                 "pages", "volume", "number",
                  "Custom 1", "ISBN/ISSN") %>%
-          mutate(abstract = gsub("\\r\\n|\\r|\\n", "", abstract))
+          mutate(abstract = "")
         
         names(results) <- toTitleCase(names(results))
         
@@ -2412,6 +2429,7 @@ download_table_Server <- function(id, table) {
     }
   )
 }
+
 
 #' Evidence Map UI Module
 #'
@@ -2544,7 +2562,6 @@ evidence_map_UI <- function(id,
 #' for resetting filters and managing state across sessions.
 #'
 #' @export
-
 evidence_map_Server <- function(id,
                                 citations_metadata = citations_for_dl,
                                 x_axis_table,
@@ -2838,17 +2855,7 @@ evidence_map_Server <- function(id,
             distinct(.data[[x_axis_specific_column]]) %>%
             arrange(.data[[x_axis_specific_column]]) %>%
             pull(.data[[x_axis_specific_column]])
-          
-          # Code for selecting possible x axis specific based on y axis specific input
-          #     x_axis_selected <- x_group %>%
-          #       select(uid, !!x_type() := x_axis_specific_column) %>%
-          #       left_join(y_axis_table[, c("uid", y_axis_specific_column)], by = "uid", relationship = "many-to-many") %>%
-          #       rename(!!y_type() := y_axis_specific_column) %>%
-          #       filter(.data[[y_type()]] %in% input$y_axis_specific_select) %>%
-          #       distinct(.data[[x_type()]]) %>%
-          #       pull(.data[[x_type()]])
-          
-          
+
           # Only update picker input's `choices` and `selected` if the main category changes
           updatePickerInput(session, "x_axis_specific_select",
                             choices = sort(x_axis_distinct),
@@ -2888,21 +2895,7 @@ evidence_map_Server <- function(id,
             distinct(.data[[legend_specific_column]]) %>%
             arrange(.data[[legend_specific_column]]) %>%
             pull(.data[[legend_specific_column]])
-          
-          # Code for selecting possible legend specific based on x & y axis specifc input
-          # legend_selected <- legend_group %>%
-          #   select(uid, !!legend_type() := legend_specific_column) %>%
-          #   left_join(y_axis_table[, c("uid", y_axis_specific_column)], by = "uid", relationship = "many-to-many") %>%
-          #   rename(!!y_type() := y_axis_specific_column) %>%
-          #   filter(.data[[y_type()]] %in% input$y_axis_specific_select) %>%
-          #   left_join(x_axis_table[, c("uid", x_axis_specific_column)], by = "uid", relationship = "many-to-many") %>%
-          #   rename(!!x_type() := x_axis_specific_column) %>%
-          #   filter(.data[[x_type()]] %in% input$x_axis_specific_select) %>%
-          #   distinct(.data[[legend_type()]]) %>%
-          #   arrange(.data[[legend_type()]]) %>% 
-          #   pull(.data[[legend_type()]])
-          
-          
+
           # Only update picker input's `choices` and `selected` if the main category changes
           updatePickerInput(session, "legend_specific_select",
                             choices = sort(legend_distinct),

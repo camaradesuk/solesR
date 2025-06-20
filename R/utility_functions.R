@@ -153,8 +153,9 @@ get_syrf_sample <- function(df, sample_size = 2000, abstracts_only = TRUE){
   if (abstracts_only) {
 
     df_with_abstracts <- df %>%
-      filter(!is.na(abstract)) %>%
-      filter(!abstract == "")
+      filter(!(is.na(abstract) | 
+                 abstract == "" | 
+                 stringr::str_detect(abstract, stringr::regex("no abstract available", ignore_case = TRUE))))
 
     abstracts_only_sample <- df_with_abstracts[sample(nrow(df_with_abstracts), sample_size), ]
 
