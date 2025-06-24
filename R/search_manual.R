@@ -101,7 +101,7 @@ format_cols <- function(df) {
     mutate(across(all_of(lower_case_cols), ~ stringr::str_to_lower(.))) %>%
     mutate(across(all_of(title_case_cols), ~ stringr::str_to_title(.))) %>%
     # Add additional space after semi-colon
-    mutate_at(vars(x), ~ gsub(";", "; ", .))
+    mutate(across(all_of(x), ~ gsub(";", "; ", .)))
 
   # Replace double hyphens with single hyphen in pages column
   df$pages <- lapply(df$pages, function(x) gsub("--", "-", x))
