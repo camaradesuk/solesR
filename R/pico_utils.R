@@ -572,6 +572,7 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 #' @import dplyr
 #' @import osfr
 #' @param con Connection to soles project db
+#' @param master_node OSF node
 #'
 #'
 #' @examples
