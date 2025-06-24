@@ -402,6 +402,7 @@ process_medline <- function(path) {
 #'
 #' @importFrom bibliometrix convert2df
 #' @importFrom tidyr unite
+#' @import ASySD
 #' @import dplyr
 process_wos <- function(path) {
   # Extract file extension
@@ -538,6 +539,7 @@ process_wos <- function(path) {
 #' @importFrom tidyr unite
 #' @importFrom stringr str_extract
 #' @import dplyr
+#' @import ASySD
 process_pubmed <- function(path) {
   # Extract file extension
   file_extension <- tools::file_ext(path)
