@@ -29,7 +29,6 @@ Imports:
     fst,
     RISmed,
     lubridate,
-    rwos,
     scopusAPI,
     magrittr,
     rcrossref,
@@ -70,7 +69,8 @@ Imports:
     dplyr,
     dbplyr,
     httr,
-    jsonlite
+    jsonlite,
+    caret
 VignetteBuilder: knitr
 Remotes: 
     kaitlynhair/RISmed,
