@@ -42,7 +42,7 @@ manual_upload <- function(paths, source) {
   # Define function to handle manual file processing logic
   process_manual_upload <- function(process_function) {
     # Check operating system and apply function
-    if (.Platform$OS.type == "Unix") {
+    if (.Platform$OS.type == "unix") {
       # Run in parallel for Unix OS
       processed_results <- parallel::mclapply(paths,
         process_function,
@@ -59,6 +59,9 @@ manual_upload <- function(paths, source) {
 
   # Call the processing function based on the data source
   combined_data <- process_manual_upload(manual_process_functions[[source]])
+  
+  # Return data
+  return(combined_data)
 }
 
 #' Format Manual Upload Search Data Columns for SOLES
@@ -156,18 +159,18 @@ process_embase <- function(path) {
   # If book, add booktitle to title column
   if ("booktitle" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
+      tidyr::unite(title, booktitle, na.rm = TRUE)
   }
 
   # If has both start and end page, combine into one column
   if ("start_page" %in% colnames(newdat) &
     "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep = "-", na.rm = TRUE)
+      tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE)
   } else {
     # Else take start page only
     newdat <- newdat %>%
-      mutate(pages = .data$start_page)
+      mutate(pages = start_page)
   }
 
   # Set date as today
@@ -181,8 +184,8 @@ process_embase <- function(path) {
 
   # Create unique article identifier for each record
   newdat <- newdat %>%
-    mutate(pmid = ifelse(!is.na(.data$article_id), gsub("\\[.*", "", .data$article_id), "")) %>%
-    mutate(uid = paste0("embase-", .data$AN))
+    mutate(pmid = ifelse(!is.na(article_id), gsub("\\[.*", "", article_id), "")) %>%
+    mutate(uid = paste0("embase-", AN))
 
   # If publication type column exists, rename it for SOLES
   if ("PT" %in% colnames(newdat)) {
@@ -247,23 +250,23 @@ process_psychinfo <- function(path) {
   # If book, use booktitle as title
   if ("booktitle" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
+      tidyr::unite(title, booktitle, na.rm = TRUE)
   }
 
   # If has both start and end page, combine into one column
   if ("start_page" %in% colnames(newdat) &
     "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep = "-", na.rm = TRUE)
+      tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE)
   } else {
     # Else take start page only
     newdat <- newdat %>%
-      mutate(pages = .data$start_page)
+      mutate(pages = start_page)
   }
 
   # If no pages given, set as NA
   newdat <- newdat %>%
-    mutate(pages = ifelse(.data$pages == "No-Specified", NA_character_, paste(.data$pages)))
+    mutate(pages = ifelse(pages == "No-Specified", NA_character_, paste(pages)))
 
   # Set date as tday
   newdat$date <- format(Sys.Date(), "%d%m%y")
@@ -277,7 +280,7 @@ process_psychinfo <- function(path) {
   # Create identifer columns
   newdat <- newdat %>%
     mutate(pmid = "") %>%
-    mutate(uid = paste0("psychinfo-", .data$article_id))
+    mutate(uid = paste0("psychinfo-", article_id))
 
   # Set source
   newdat$source <- "psychinfo"
@@ -336,18 +339,18 @@ process_medline <- function(path) {
   # If book, use booktitle as title
   if ("booktitle" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
+      tidyr::unite(title, booktitle, na.rm = TRUE)
   }
 
   # If has both start and end page, combine both
   if ("start_page" %in% colnames(newdat) &
     "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep = "-", na.rm = TRUE)
+      tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE)
   } else {
     # Else take start page only
     newdat <- newdat %>%
-      mutate(pages = .data$start_page)
+      mutate(pages = start_page)
   }
 
   # Set dat as today
@@ -361,8 +364,8 @@ process_medline <- function(path) {
 
   # Assign identifiers
   newdat <- newdat %>%
-    mutate(pmid = .data$article_id) %>%
-    mutate(uid = paste0("medline-", .data$article_id))
+    mutate(pmid = article_id) %>%
+    mutate(uid = paste0("medline-", article_id))
 
   # Set source
   newdat$source <- "medline"
@@ -413,11 +416,11 @@ process_wos <- function(path) {
     if ("start_page" %in% colnames(newdat) &
       "end_page" %in% colnames(newdat)) {
       newdat <- newdat %>%
-        tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep = "-", na.rm = TRUE)
+        tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE)
     } else {
       # Else use start page only
       newdat <- newdat %>%
-        mutate(pages = .data$start_page)
+        mutate(pages = start_page)
     }
 
     # If secondary title not given, create and set to NA
@@ -456,12 +459,12 @@ process_wos <- function(path) {
     # Select correctly named column names for SOLES
     newdat <- newdat %>%
       select(
-        uid = .data$AN, author = .data$AU, year = .data$PY, journal = .data$T2,
-        .data$doi, title = .data$TI, .data$pages, .data$volume,
-        abstract = .data$AB, .data$isbn, .data$keywords, .data$secondarytitle,
-        .data$url, .data$date, .data$issn, .data$pmid, ptype = .data$source_type,
-        .data$source, number = .data$issue, .data$author_country,
-        author_affiliation = .data$PA
+        uid = AN, author = AU, year = PY, journal = T2,
+        doi, title = TI, pages, volume,
+        abstract = AB, isbn, keywords, secondarytitle,
+        url, date, issn, pmid, ptype = source_type,
+        source, number = issue, author_country,
+        author_affiliation = PA
       )
 
     # Run format DOI function to ensure DOIs are consistently formatted
@@ -472,9 +475,14 @@ process_wos <- function(path) {
   } else if (file_extension %in% c("bib")) {
     # Read data using bibliometrix package
     newdat <- bibliometrix::convert2df(path, dbsource = "wos", format = "bibtex")
+    
+    # Read in field codes from ASySD
+    field_codes <- rbind(
+      ASySD::field_codes_wos %>% dplyr::select(Abbreviation, Field),
+      data.frame(Abbreviation = "UT", Field = "uid"))
 
     # Get column names
-    lookup_table <- setNames(field_codes_wos$Field, field_codes_wos$Abbreviation)
+    lookup_table <- setNames(field_codes$Field, field_codes$Abbreviation)
     colnames(newdat) <- lookup_table[colnames(newdat)]
 
     # Remove columns that are blank
@@ -486,14 +494,11 @@ process_wos <- function(path) {
     newdat$source <- "wos"
 
     # Create unique identifier
-    newdat["uid"] <- lapply(newdat["uid"], function(x) gsub("WOS", "wos:", x))
+    newdat$uid <- gsub("WOS:", "wos:", newdat$uid)
+    
+    newdat$uid <- lapply(newdat$uid, function(x) gsub("WOS", "wos:", x))
 
-    # Get author country
-    newdat$author_country <- stringr::str_extract(newdat$author_country, "\\b(\\w+)\\b$")
-    # Make title cause
-    newdat$author_country <- tools::toTitleCase(newdat$author_country)
-
-    # Rename pubication type column
+    # Rename publication type column
     newdat$ptype <- newdat$article_type
 
     # Run format DOI function to ensure DOIs are consistently formatted
@@ -546,7 +551,7 @@ process_pubmed <- function(path) {
   newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format = "pubmed")
 
   # Get column names
-  lookup_table <- setNames(field_codes_pubmed$Field, field_codes_pubmed$Abbreviation)
+  lookup_table <- setNames(ASySD::field_codes_pubmed$Field, ASySD::field_codes_pubmed$Abbreviation)
   colnames(newdat) <- lookup_table[colnames(newdat)]
 
   # Remove columns that are blank
@@ -565,9 +570,9 @@ process_pubmed <- function(path) {
 
   # Create unique identifiers
   newdat <- newdat %>%
-    dplyr::mutate(uid = paste0("pubmed-", .data$record_id)) %>%
-    dplyr::mutate(pmid = .data$record_id) %>%
-    dplyr::mutate(doi = ifelse(is.na(.data$doi), stringr::str_extract(.data$article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), .data$doi))
+    dplyr::mutate(uid = paste0("pubmed-", record_id)) %>%
+    dplyr::mutate(pmid = record_id) %>%
+    dplyr::mutate(doi = ifelse(is.na(doi), stringr::str_extract(article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), doi))
 
   # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
@@ -642,22 +647,22 @@ process_scopus <- function(path) {
   # If book, use booktitle in title
   if ("booktitle" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$title, .data$booktitle, na.rm = TRUE)
+      tidyr::unite(title, booktitle, na.rm = TRUE)
   }
 
   # If start and end pages both given, combine
   if ("start_page" %in% colnames(newdat) &
     "end_page" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$pages, .data$start_page, .data$end_page, sep = "-", na.rm = TRUE)
+      tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE)
   } else if ("page_start" %in% colnames(newdat) &
     "page_end" %in% colnames(newdat)) {
     newdat <- newdat %>%
-      tidyr::unite(.data$pages, .data$page_start, .data$page_end, sep = "-", na.rm = TRUE)
+      tidyr::unite(pages, page_start, page_end, sep = "-", na.rm = TRUE)
   } else {
     # Else use only start page
     newdat <- newdat %>%
-      mutate(pages = .data$start_page)
+      mutate(pages = start_page)
   }
 
   # Set date as today's date
@@ -672,7 +677,7 @@ process_scopus <- function(path) {
   # Rename link to url
   if (!"url" %in% colnames(newdat) &
     "link" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(url = .data$link)
+    newdat <- newdat %>% rename(url = link)
   }
 
   # Get pattern for unique identifiers
@@ -681,12 +686,12 @@ process_scopus <- function(path) {
   # Create unique identifier
   newdat <- newdat %>%
     ungroup() %>%
-    mutate(uid = ifelse(!is.na(.data$url), stringr::str_extract(.data$url, pattern),
+    mutate(uid = ifelse(!is.na(url), stringr::str_extract(url, pattern),
       paste0("unknown-accession-", floor(runif(n(), min = 100, max = 10000000)))
     )) %>%
-    dplyr::mutate(uid = gsub("eid=", "", .data$uid)) %>%
-    dplyr::mutate(pmid = .data$pubmed_id) %>%
-    dplyr::mutate(uid = paste0("scopus-", .data$uid))
+    dplyr::mutate(uid = gsub("eid=", "", uid)) %>%
+    dplyr::mutate(pmid = pubmed_id) %>%
+    dplyr::mutate(uid = paste0("scopus-", uid))
 
   # Set source
   newdat$source <- "scopus"
@@ -694,13 +699,13 @@ process_scopus <- function(path) {
   # Format author column
   if (!"author" %in% colnames(newdat) &
     "ef_bb_bf_author" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(author = .data$ef_bb_bf_author)
+    newdat <- newdat %>% rename(author = ef_bb_bf_author)
   }
 
   # Format keywords column
   if (!"keywords" %in% colnames(newdat) &
     "author_keywords" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(keywords = .data$author_keywords)
+    newdat <- newdat %>% rename(keywords = author_keywords)
   }
 
   # Run format DOI function to ensure DOIs are consistently formatted
@@ -765,13 +770,13 @@ process_endnote <- function(path) {
   # Set source for each record depending on origin
   newdat <- newdat %>%
     mutate(source = case_when(
-      grepl("scopus", .data$url, ignore.case = TRUE) ~ "scopus",
-      grepl("Embase", .data$database, ignore.case = TRUE) ~ "embase",
-      grepl("pubmed", .data$database, ignore.case = TRUE) ~ "pubmed",
-      grepl("BIOSIS", .data$url, ignore.case = TRUE) ~ "biosis",
-      grepl("BCI:", .data$url, ignore.case = TRUE) ~ "biosis",
-      grepl("wos", .data$accession, ignore.case = TRUE) ~ "wos",
-      grepl("medline", .data$database, ignore.case = TRUE) ~ "medline",
+      grepl("scopus", url, ignore.case = TRUE) ~ "scopus",
+      grepl("Embase", database, ignore.case = TRUE) ~ "embase",
+      grepl("pubmed", database, ignore.case = TRUE) ~ "pubmed",
+      grepl("BIOSIS", url, ignore.case = TRUE) ~ "biosis",
+      grepl("BCI:", url, ignore.case = TRUE) ~ "biosis",
+      grepl("wos", accession, ignore.case = TRUE) ~ "wos",
+      grepl("medline", database, ignore.case = TRUE) ~ "medline",
       TRUE ~ "unknown" # Keep the original source if none of the conditions match
     )) %>%
     ungroup()
@@ -779,13 +784,13 @@ process_endnote <- function(path) {
   # Set identifiers for each second depending on origin
   newdat <- newdat %>%
     rowwise() %>%
-    mutate(accession = ifelse(.data$source %in% "scopus", regmatches(url, regexpr(pattern, .data$url)), .data$accession)) %>%
+    mutate(accession = ifelse(source %in% "scopus", regmatches(url, regexpr(pattern, url)), accession)) %>%
     ungroup() %>%
-    mutate(accession = ifelse(is.na(.data$accession), paste0("noid:", 1000 + row_number()), .data$accession)) %>%
-    mutate(accession = gsub("eid=", "", .data$accession)) %>%
-    mutate(accession = gsub("WOS:", "", .data$accession)) %>%
-    mutate(uid = paste0(.data$source, "-", .data$accession)) %>%
-    mutate(uid = gsub("unknown-noid:", "unknown-", .data$uid))
+    mutate(accession = ifelse(is.na(accession), paste0("noid:", 1000 + row_number()), accession)) %>%
+    mutate(accession = gsub("eid=", "", accession)) %>%
+    mutate(accession = gsub("WOS:", "", accession)) %>%
+    mutate(uid = paste0(source, "-", accession)) %>%
+    mutate(uid = gsub("unknown-noid:", "unknown-", uid))
 
   # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)

@@ -20,11 +20,11 @@ test_that("manual_upload() function works as expected", {
   # Define test cases
   wos1 <- manual_upload("wos.ris", source = "wos")
   wos2 <- manual_upload("wos.bib", source = "wos")
-  medline <- manual_upload("medline.xml", source = "xml")
+  medline <- manual_upload("medline.xml", source = "endnote")
   scopus <- manual_upload("scopus.ris", source = "scopus") 
   psychinfo <- manual_upload("psychinfo.ris", source = "psychinfo")
   embase <- manual_upload("embase.ris", source = "embase")
-  eric <- manual_upload("eric.xml", source="xml")
+  eric <- manual_upload("eric.xml", source="endnote")
   
   # Write assertions for each test case
   expect_true(is.data.frame(wos1), info = "wos1 should be a data frame")
