@@ -153,8 +153,9 @@ get_syrf_sample <- function(df, sample_size = 2000, abstracts_only = TRUE){
   if (abstracts_only) {
 
     df_with_abstracts <- df %>%
-      filter(!is.na(abstract)) %>%
-      filter(!abstract == "")
+      filter(!(is.na(abstract) | 
+                 abstract == "" | 
+                 stringr::str_detect(abstract, stringr::regex("no abstract available", ignore_case = TRUE))))
 
     abstracts_only_sample <- df_with_abstracts[sample(nrow(df_with_abstracts), sample_size), ]
 
@@ -297,578 +298,6 @@ syrf_decisions_to_db <- function(con,
 
     message("Data must be cleaned manually and written to study_classification")
 
-  }
-}
-
-#' Check and optionally delete redundant tables in the database.
-#'
-#' This function checks whether the column names of each table in the database
-#' match the expected column names. Optionally, it can delete tables that are
-#' redundant (not expected). It also checks the format of the scopus and wos
-#' uids in the relevant columns, as well as the doi column in each table. Providing
-#' the user with an option to update them to the correct format where necessary.
-#'
-#' @param con A database connection object.
-#' @param delete_redundant Logical. If TRUE, delete redundant tables after
-#'   saving them as .fst files.
-#'
-#' @return The function doesn't return anything, but prints messages indicating
-#'   whether column names match and actions taken.
-#'
-#' @examples
-#' \dontrun{
-#' # Connect to the database
-#' con <- pool::dbPool(RPostgres::Postgres(),
-#'                     dbname = Sys.getenv("ad_soles_dbname"),
-#'                     host = Sys.getenv("ad_soles_host"),
-#'                     port = 5432,
-#'                     user = Sys.getenv("ad_soles_user"),
-#'                     password = Sys.getenv("ad_soles_password"))
-#'
-#' # Check tables and delete redundant ones
-#' check_tables(con, delete_redundant = FALSE)
-#'
-#' # Close the database connection
-#' poolClose(con)
-#' }
-#'
-#' @import DBI
-#' @import dplyr
-#' @import fst
-#' @import crayon
-#' @export
-check_tables <- function(con, delete_redundant = FALSE) {
-
-  # Get the list of tables in the database
-  dbtables <- dbListTables(con)
-
-  # Define expected tables
-  expected_tables <- c("unique_citations", "retrieved_citations",
-                       "study_classification", "ml_performance",
-                       "full_texts", "oa_tag", "rob_tag",
-                       "pico_tag", "pico_ontology",
-                       "pico_dictionary", "open_data_tag",
-                       "citation_source_match", "article_type")
-
-  # Define the expected column names for each table
-  expected_colnames <- list(
-    unique_citations = c(
-      "uid", "doi", "author", "year", "journal", "title", "abstract",
-      "volume", "number", "pages", "isbn", "keywords", "url", "date",
-      "issn", "source", "author_country", "author_affiliation", "ptype",
-      "pmid", "secondarytitle"
-    ),
-    article_type = c("doi", "ptype", "language", "method"),
-    retrieved_citations = c("uid", "label"),
-    study_classification = c("uid", "name", "decision", "score", "date", "cid", "type"),
-    ml_performance = c("threshold", "utility", "specificity", "sensitivity",
-                       "precision", "f1", "balanced_accuracy", "cid"),
-    full_texts = c("status", "doi", "path"),
-    open_data_tag = c("doi", "is_open_data", "open_data_category", "is_open_code",
-                      "open_data_statements", "open_code_statements", "method"),
-    oa_tag = c("doi", "is_oa", "oa_status", "method"),
-
-    rob_tag = c("is_blind", "is_random", "is_exclusion", "is_welfare", "is_interest",
-                "blind_prob", "interest_prob", "welfare_prob", "random_prob", "exclusion_prob", "doi"
-    ),
-    pico_ontology = c(
-      "regex_id", "type", "main_category", "sub_category1", "sub_category2"
-    ),
-    pico_dictionary = c("id", "name", "regex"),
-    pico_tag = c("uid", "regex_id", "method", "frequency", "strings"),
-    citation_source_match = c("uid", "doi", "pmid", "wos_accession", "scopus_accession")
-  )
-
-  # Function to check column names for a table
-  check_tables_exist <- function() {
-
-    if(all(expected_tables %in% dbtables)==TRUE) {
-
-      cat(green("All required tables present!\n"))}
-
-    else {
-      missing_tables <- dbtables[which(!expected_tables %in% dbtables)]
-
-      cat(red("Missing tables: ", missing_tables, "\n"))
-    }}
-
-
-  # Function to check column names for a table
-  check_column_names <- function(table_name) {
-    if (table_name %in% expected_tables) {
-
-      actual_column_names <- tbl(con, table_name) %>% colnames()
-      expected_colnames_table <- expected_colnames[[table_name]]
-
-      if (all(actual_column_names %in% expected_colnames_table) &&
-          all(expected_colnames_table %in% actual_column_names)) {
-        cat(green("Column names for", table_name, "match the expected column names.\n"))
-      } else {
-        cat(red("Column names for", table_name, "do NOT match the expected column names.\n"))
-      }
-    } else {
-      cat("Table", table_name, "not currently required for SOLES. \n")
-    }
-  }
-
-  # Function to check format of uids
-  check_uids <- function(table_name){
-
-    if (table_name %in% expected_tables) {
-
-      if ("uid" %in% expected_colnames[[i]]){
-
-        table <- dbReadTable(con, table_name)
-
-        uids <- table$uid
-
-        # Count number of incorrect wos ids
-        wos_uids_count <- sum(grepl("^wos:", uids))
-
-        if (wos_uids_count > 0) {
-          cat(red("Number of uids starting with 'wos:' in", table_name, ":", wos_uids_count, "\n"))
-
-          change_uids <- menu(c("Yes", "No"),
-                              title = message("Do you want to change all wos uids starting with 'wos:' to 'wos-'?"))
-
-          if (change_uids == 1) {
-
-            # Check to see if folder exists
-            if (!file.exists("db_tables_legacy")) {
-              dir.create("db_tables_legacy")
-            }
-
-            cat("Saving", table_name, "table to fst file in db_tables_legacy folder...\n")
-
-            # Write unchanged table to legacy folder
-            legacy_path <- paste0("db_tables_legacy/", table_name, ".fst")
-            write.fst(table, legacy_path)
-
-            # Change uids
-            table$uid <- gsub("^wos:", "wos-", uids)
-
-            # Update database with the modified table
-            dbWriteTable(con, name = table_name, value = table, overwrite = TRUE)
-
-            cat(wos_uids_count, "wos uids in", table_name,  "updated successfully.\n")
-
-            # Log the changes
-            log_message <- paste(Sys.time(), ": Changed", wos_uids_count, "wos uids in", table_name, "from 'wos:' to 'wos-'.")
-            write(log_message, file = "db_tables_legacy/change_log.txt", append = TRUE)
-            cat("Updating log file...\n")
-
-          } else {
-
-            cat("No changes made.\n")
-          }
-        } else {
-
-          cat(green("uids for wos match the expected format.\n"))
-        }
-
-        # Connect to table again as it may have been updated above
-        table <- dbReadTable(con, table_name)
-
-        uids <- table$uid
-
-        # Count number of incorrect scopus ids
-        scopus_uids_count <- sum(grepl("^2-", uids))
-
-        if (scopus_uids_count > 0){
-
-          cat(red("Number of uids starting with '2-' in", table_name, ":", scopus_uids_count, "\n"))
-
-          change_uids <- menu(c("Yes", "No"),
-                              title = message("Do you want to change all scopus uids starting with '2-' to 'scopus-2-'?"))
-
-          if (change_uids == 1) {
-
-            if (!file.exists("db_tables_legacy")) {
-              dir.create("db_tables_legacy")
-            }
-
-            cat("Saving", table_name, "table to fst file in db_tables_legacy folder...\n")
-
-            legacy_path <- paste0("db_tables_legacy/", table_name, ".fst")
-
-            # Check to see if legacy file for this table already exists, if it does exist then leave it.
-            if (!file.exists(legacy_path)) {
-
-              write.fst(table, legacy_path)
-
-            }
-
-            # Change uids
-            table$uid <- gsub("^2-", "scopus-2-", uids)
-
-            # Update database with the modified table
-            dbWriteTable(con, name = table_name, value = table, overwrite = TRUE)
-
-            cat(scopus_uids_count, "scopus uids in", table_name,  "updated successfully.\n")
-
-            # Log the changes
-            log_message <- paste(Sys.time(), ": Changed", scopus_uids_count, "scopus uids in", table_name, "from '2-' to 'scopus-2-'.")
-            write(log_message, file = "db_tables_legacy/change_log.txt", append = TRUE)
-            cat("Updating log file...\n")
-
-          } else {
-
-            cat("No changes made.\n")
-          }
-
-        } else {
-          cat(green("uids for scopus match the expected format.\n"))
-        }
-      }
-    }
-  }
-
-  check_dois <- function(table_name){
-    if (table_name %in% expected_tables) {
-
-      if ("doi" %in% expected_colnames[[i]]){
-
-        table <- dbReadTable(con, table_name)
-
-        table_updated <- format_doi(table)
-
-        doi_check <- table_updated %>%
-          filter(!doi %in% table$doi)
-
-        if (nrow(doi_check) > 0){
-
-          cat(red("There are", nrow(doi_check), "dois in", table_name, "which are formatted incorrectly\n"))
-
-          change_dois <- menu(c("Yes", "No"),
-                              title = message("Would you like to reformat them all using format_doi()"))
-
-          if (change_dois == 1) {
-
-            if (!file.exists("db_tables_legacy")) {
-              dir.create("db_tables_legacy")
-            }
-            cat("Saving unchanged", table_name, "table to fst file in db_tables_legacy folder...\n")
-
-            legacy_path <- paste0("db_tables_legacy/", table_name, ".fst")
-
-            if (!file.exists(legacy_path)) {
-
-              write.fst(table, legacy_path)
-
-            }
-
-            # Update database with the modified table
-            dbWriteTable(con, name = table_name, value = table_updated, overwrite = TRUE)
-
-            cat(nrow(doi_check), "dois in", table_name,  "reformatted successfully.\n")
-
-            # Log the changes
-            log_message <- paste(Sys.time(), ": Reformatted", nrow(doi_check), "dois in", table_name)
-            write(log_message, file = "db_tables_legacy/change_log.txt", append = TRUE)
-            cat("Updating log file...\n")
-
-          } else{
-
-            cat("No changes made.\n")
-
-          }
-        } else {
-
-          cat(green("All dois formatted correctly\n"))
-
-        }
-      }
-    }
-  }
-
-
-  # Check tables exist
-  check_tables_exist()
-
-  # Check column names for each table
-  for(i in dbtables){
-
-    check_column_names(i)
-    check_uids(i)
-    check_dois(i)
-  }
-
-  if(delete_redundant == TRUE){
-
-    message(paste("Warning: This will DELETE database tables that are redundant in the current SOLES workflow"))
-
-    user_input <- menu(c("Yes", "No"),
-                       title= paste("Are you sure you want to proceed?"))
-
-
-    if (user_input == "1") {
-
-      redundant_tables <- dbtables[!dbtables %in% expected_tables]
-
-      # Loop through the tables and write to fst files
-      for (table_name in redundant_tables) {
-        query <- paste("SELECT * FROM", table_name)
-        df <- dbGetQuery(con, query)
-
-        # Write the dataframe to an fst file
-        fst::write_fst(df, paste0(table_name, ".fst"))
-        message("saving a backup of", table_name, "as a .fst file before deleting...")
-
-        # Remove the table from the database
-        dbRemoveTable(con, table_name)
-        message("removed", table_name, "from soles database")
-
-      }
-
-    } else {
-      return("No tables have been removed.")}
-
-  }
-}
-
-#' Get Screening Decisions from the Database
-#'
-#' This function retrieves screening decisions from the "study_classification" table
-#' in the specified database and returns a data frame in the correct format to run the machine learning function.
-#'
-#' @import dplyr
-#'
-#' @param con A database connection object.
-#' @param review_id A unique identifier for the review associated with the screening decisions.
-#'
-#' @return A data frame containing screening decisions with columns: ITEM_ID, LABEL, TITLE, ABSTRACT, KEYWORDS, Cat, REVIEW_ID.
-#'
-#' @examples
-#' \dontrun{
-#'   screening_decisions <- get_screening_decisions(con = your_database_connection, review_id = "your_project_plus_date")
-#' }
-#'
-get_screening_decisions <- function(con, review_id = ""){
-
-  screening_decisions <- tbl(con, "study_classification") %>%
-    filter(type == "human_reviewer") %>%
-    left_join(tbl(con, "unique_citations"), by = "uid") %>%
-    select(ITEM_ID = uid, LABEL = decision, TITLE = title, ABSTRACT = abstract, KEYWORDS = keywords) %>%
-    mutate(LABEL = ifelse(LABEL == "include", 1, 0),
-           Cat = "",
-           REVIEW_ID = review_id) %>%
-    collect()
-
-  return(screening_decisions)
-
-}
-
-#' Complete PICO Tagging Function
-#'
-#' This function checks how many studies are still to be tagged, then runs the pico_tag function multiple times until there are no more studies to tag.
-#'
-#' @param con A database connection object.
-#' @param tag_method The tagging method to use, either "fulltext" or "tiabkw".
-#' @param tag_type The type of PICO tag to apply (e.g. "intervention", "species" etc).
-#' @param tag_main_category The main category of the PICO tag. Default is "all".
-#'
-#' @return The function does not explicitly return a value, but it updates the connected database with new pico tags.
-#'
-#' @details
-#' This function retrieves studies that are already tagged using the specified tagging method, and then tags the remaining studies that meet
-#' the specified criteria. It supports two tagging methods: "fulltext" and "tiabkw". The tagging process
-#' involves using regular expressions to extract relevant information from the full text or title/abstract/keywords, depending on
-#' the chosen method.
-#'
-#' @examples
-#' \dontrun{
-#' Tag studies using full text regex
-#' complete_pico_tag(con, tag_method = "fulltext", tag_type = "intervention", tag_main_category = "all")
-#'}
-#' @import dplyr
-#' @import dbplyr
-#' @export
-complete_pico_tag <- function(con, tag_method = "", tag_type = "", tag_main_category = "all"){
-
-  #browser()
-  got_ft <- tbl(con, "full_texts") %>% filter(status=="found") %>% select(doi, path)
-
-  # Get included studies
-  included <- tbl(con, "study_classification") %>% filter(decision == "include")
-
-  # Get included relevant studies + metadata
-  included_studies <- tbl(con, "unique_citations") %>%
-    select(uid, title, abstract, keywords, doi) %>%
-    semi_join(included, by="uid") %>%
-    left_join(got_ft, by="doi") %>%
-    collect()
-
-  if (tag_method == "fulltext"){
-
-    method <- "fulltext_regex"
-
-    message(paste0("Retrieving studies already tagged using full text regex..."))
-
-    if (tag_main_category == "all"){
-
-      tagged <- tbl(con, "pico_ontology") %>%
-        filter(type == tag_type) %>%
-        left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-        filter(method == method) %>%
-        select(uid, method, regex_id) %>%
-        collect()
-
-    }else{
-
-      # Retrieve studies already tagged by full text
-      tagged <- tbl(con, "pico_ontology") %>%
-        filter(type == tag_type) %>%
-        filter(main_category %in% tag_main_category) %>%
-        left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-        filter(method == method) %>%
-        select(uid, method, regex_id) %>%
-        collect()
-    }
-
-    to_tag <- included_studies %>%
-      filter(!uid %in% tagged$uid) %>%
-      filter(!path == "")
-
-    message(paste0("Total number of studies still to tag using full text: ", length(to_tag$uid)))
-    pre_to_tag <- to_tag
-    new_tags <- 0
-    total_new_tags <- 0
-
-    # Run loop until all remaining studies are tagged
-    while (new_tags < length(to_tag$uid)){
-
-      try(pico_tag(con, tag_type = tag_type,
-                   tag_main_category = tag_main_category,
-                   tag_method = tag_method,
-                   extract_strings = FALSE))
-
-      if (tag_main_category == "all"){
-
-        post_tagged <- tbl(con, "pico_ontology") %>%
-          filter(type == tag_type) %>%
-          left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-          filter(method == method) %>%
-          select(uid, method, regex_id) %>%
-          collect()
-
-      }else{
-
-        # Retrieve studies already tagged by full text
-        post_tagged <- tbl(con, "pico_ontology") %>%
-          filter(type == tag_type) %>%
-          filter(main_category %in% tag_main_category) %>%
-          left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-          filter(method == method) %>%
-          select(uid, method, regex_id) %>%
-          collect()
-      }
-
-      post_to_tag <- included_studies %>%
-        filter(!uid %in% post_tagged$uid) %>%
-        filter(!path == "")
-
-      # Calculate how many studies are still to be tagged
-      new_tags <- length(pre_to_tag$uid) - length(post_to_tag$uid)
-      total_new_tags <- total_new_tags + new_tags
-      message(paste0("Number of studies to tag by ", tag_method, " : ", length(post_to_tag$uid)))
-
-      # If there are no new studies still to be tagged exit the loop
-      if (new_tags == 0){
-
-        break
-
-      }
-
-      pre_to_tag <- post_to_tag
-
-    }
-
-    message(paste0(total_new_tags, " out of a possible ", length(to_tag$uid), " tagged for ", tag_type))
-
-  } else if (tag_method == "tiabkw_regex"){
-
-    pico_tag_method <- "tiabkw"
-
-    message(paste0("Retrieving studies already tagged using tiabkw..."))
-
-    if (tag_main_category == "all"){
-
-      tagged <- tbl(con, "pico_ontology") %>%
-        filter(type == tag_type) %>%
-        left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-        filter(method == method) %>%
-        select(uid, method, regex_id) %>%
-        collect()
-
-    }else{
-
-      # Retrieve studies already tagged by full text
-      tagged <- tbl(con, "pico_ontology") %>%
-        filter(type == tag_type) %>%
-        filter(main_category %in% tag_main_category) %>%
-        left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-        filter(method == method) %>%
-        select(uid, method, regex_id) %>%
-        collect()
-    }
-
-    to_tag <- included_studies %>%
-      filter(!uid %in% tagged$uid) %>%
-      select(uid, title, abstract, keywords)
-
-    message(paste0("Total number of studies still to tag using tiabkw: ", length(to_tag$uid)))
-    pre_to_tag <- to_tag
-    new_tags <- 0
-    total_new_tags <- 0
-
-    # Run loop until all remaining studies are tagged
-    while (total_new_tags < length(to_tag$uid)){
-
-      message("Running pico_tag for tiabkw...")
-      try(pico_tag(con, tag_type = tag_type,
-                   tag_main_category = tag_main_category,
-                   tag_method = tag_method,
-                   extract_strings = FALSE))
-
-      if (tag_main_category == "all"){
-
-        post_tagged <- tbl(con, "pico_ontology") %>%
-          filter(type == tag_type) %>%
-          left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-          filter(method == method) %>%
-          select(uid, method, regex_id) %>%
-          collect()
-
-      }else{
-
-        # Retrieve studies already tagged by full text
-        post_tagged <- tbl(con, "pico_ontology") %>%
-          filter(type == tag_type) %>%
-          filter(main_category %in% tag_main_category) %>%
-          left_join(tbl(con, "pico_tag"), by=c("regex_id")) %>%
-          filter(method == method) %>%
-          select(uid, method, regex_id) %>%
-          collect()
-      }
-
-      post_to_tag <- included_studies %>%
-        filter(!uid %in% post_tagged$uid) %>%
-        select(uid, title, abstract, keywords)
-
-      # Calculate how many new studies have been tagged
-      new_tags <- length(pre_to_tag$uid) - length(post_to_tag$uid)
-      total_new_tags <- total_new_tags + new_tags
-      message(paste0("Number of studies to still to tag by ", tag_method, " : ", length(post_to_tag$uid)))
-
-      # If there are no new studies still to be tagged then exit the loop
-      if (new_tags == 0){
-
-        break
-
-      }
-      pre_to_tag <- post_to_tag
-    }
-    message(paste0(total_new_tags, " out of a possible ", length(to_tag$uid), " tagged for ", tag_type))
   }
 }
 
@@ -1058,120 +487,77 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
 
 }
 
-#' Create Regular Expressions
+#' Remove HTML tags from text
+#' 
+#' A function that can be used to remove HTML tags from titles and abstracts
 #'
-#' This function reads a file containing names and their corresponding alternate names,
-#' then creates regular expressions based on these names and alternate names.
+#' @param string The input text for formatting
+#' 
+#' @return This function returns the formatted input string, with HTML tags removed.
 #'
-#' @param file Path to the input Excel file.
+#' @details Currently, only basic text formatting tags are identified and removed. See: https://www.w3schools.com/html/html_formatting.asp
 #'
-#' @return A new Excel file with additional columns containing regular expressions.
-#'
-#' @import readxl
-#' @import dplyr
-#' @importFrom openxlsx write.xlsx
-#'
-#' @export
 #'
 #' @examples
 #' \dontrun{
 #' # Example usage:
-#' create_regex("input_file.xlsx")
+#' df %>% mutate(across(c(title, abstract), ~ rm_html_tags(.)))
 #' }
 #'
-create_regex <- function(file = ""){
+#' @export
+#' 
 
-  # Read in file
-  file_for_regex <- read.xlsx(file)
+rm_html_tags <- function(string) {
+  
+  pattern <- "<\\/?i>|<\\/?su(p|b)>|<\\/?bold>|<\\/?b>|<\\/?em>|<\\/?mark>|
+  <\\/?small>|<\\/?del>|<\\/?in(s|f)>"
+  
+  try(string_nohtml <- gsub(pattern, "", string, ignore.case = T))
+  
+  if(is.null(string_nohtml))
+    return(string)
+  
+  else if(!is.null(string_nohtml))
+    return(string_nohtml)
+}
 
-  # Splits the df in to 2, no_alternate_names and with_alternate_names
-  no_alternate_names <- file_for_regex %>%
-    filter(is.na(alternate_names) | alternate_names == "")
+#' Format title and abstract character strings
+#' 
+#' This function performs various formatting operations on the title and abstract columns of a SOLES dataframe. These include: removal of leading and trailing whitespace, removal of double backslashes, 
+#' replacement of 2+ spaces with single space and removal of leading characters (en dash, em dash, hyphen, colon, dot).
+#'
+#' @param df The SOLES dataframe to be formatted (e.g., `unique_citations` or `retrieved_citations`)
+#' 
+#' @return This function returns the formatted dataframe
+#'
+#'
+#' @importFrom stringr str_replace_all fixed
+#' @importFrom dplyr mutate
+#'
+#' @examples
+#' \dontrun{
+#' # Example usage:
+#' df %>% format_tiab()
+#' }
+#'
+#' @export
+#' 
 
-  # Function to create a regex from the "name" column
-  name_to_regex <- function(string) {
-
-    # Split the sentence into words
-    words <- strsplit(string, "\\s")[[1]]
-
-    # Initialize a vector to store transformed patterns
-    transformed_patterns <- character(length = length(words))
-
-    # Escape any punctuation characters in the words
-    words <- gsub("([[:punct:]])", "\\\\\\1", words)
-
-    # Iterate over each word
-    for (i in seq_along(words)) {
-
-      # Check if the word starts with [a-z] (case-insensitive)
-      if (grepl("^[[:alpha:]]", words[i], ignore.case = TRUE)) {
-
-        # Apply pattern transformation with word boundaries at both start and end
-        pattern <- paste0("[", toupper(substr(words[i], 1, 1)), tolower(substr(words[i], 1, 1)), "]", substr(words[i], 2, nchar(words[i])))
-
-      } else {
-
-        # If the word doesn't start with [a-z], keep it as it is
-        pattern <- words[i]
-
-      }
-
-      # Store the transformed pattern
-      transformed_patterns[i] <- pattern
-
-    }
-
-    # Combine transformed patterns into a single string
-    collapsed_pattern <- paste(transformed_patterns, collapse = "[\\s-]*")
-
-    # Add word boundaries if the collapsed pattern starts with alphabetic character
-    if (grepl("^\\[[[:alpha:]]", collapsed_pattern, ignore.case = TRUE)) {
-      result <- paste0("\\b", collapsed_pattern, "\\b")
-    } else {
-      result <- collapsed_pattern
-    }
-
-    return(result)
-
-  }
-
-  # Apply the name_to_regex function to each name in 'no_alternate_names'
-  no_alternate_names$regex <- sapply(no_alternate_names$name, name_to_regex)
-
-  # Create a df that does have alternate names
-  with_alternate_names <- file_for_regex %>%
-    filter(!(is.na(alternate_names) | alternate_names == ""))
-
-  # Apply the name_to_regex function to each name in 'with_alternate_names'
-  with_alternate_names$name_regex <- sapply(with_alternate_names$name, name_to_regex)
-
-  # Second function to convert alternate_names to regex and collapse on "|"
-  convert_alternate_names <- function(names, separate_names_by = "\\|") {
-
-    split_strings <- strsplit(names, separate_names_by)[[1]]
-    remove_ws <- trimws(split_strings)
-    words <- sapply(remove_ws, name_to_regex)
-    join_words <- paste(words, collapse = "|")
-
-    return(join_words)
-  }
-
-  # Apply convert_alternate_names function to the alternate names
-  with_alternate_names$regex_alternate_names <- sapply(with_alternate_names$alternate_names, convert_alternate_names)
-
-  # Concatenates the "name_regex" and "regex_alternate_names" in to 1, separated by "|"
-  with_alternate_names$regex <- apply(with_alternate_names[, c("name_regex", "regex_alternate_names")], 1, function(x) paste(x, collapse = "|"))
-
-  # Binds the 2 sections back together, no_alternate_names and with_alternate_names
-  file_with_regex <- with_alternate_names %>%
-    select(name, type, main_category, sub_category1, sub_category2, alternate_names, regex) %>%
-    rbind(no_alternate_names)
-
-  # Create a new file name
-  new_file_name <- paste0("updated_regex_", file)
-  write.xlsx(file_with_regex, new_file_name)
-
-  message(paste0("File updated with regex and written to working directory"))
-  message(paste0("File named: ", new_file_name))
-
+format_tiab <- function(df) {
+  
+  try(
+    df <- df %>% 
+      # removes leading/trailing whitespace 
+      mutate(across(c(title, abstract), ~trimws(., "both"))) %>%
+      # removes leading dashes and other characters, including when preceded or followed by a space
+      mutate(across(c(title, abstract), ~trimws(., "left", whitespace = "\\s?(\\.|\\:|\\-|\\—|\\–|\\-)\\s?"))) %>%
+      # replaces multiple spaces with a single space and replaces the phrase 'textbackslash' if present with a space
+      mutate(across(c(title, abstract), ~stringr::str_replace_all(., "\\s+|[Tt]extbackslash", " "))) %>% 
+      # removes occurrences of \\n
+      mutate(across(c(title, abstract), ~stringr::str_replace_all(., stringr::fixed("\\\\n"), ""))) %>% 
+      # removes occurrences of double backslashes
+      mutate(across(c(title, abstract), ~stringr::str_replace_all(., stringr::fixed("\\\\"), "")))
+  )
+  
+  return(df)
 }

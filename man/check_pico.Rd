@@ -5,10 +5,12 @@
 \title{This function checks the status of pico tables in a SOLES project and provides users the option of
 updating to the newest version available on OSF.}
 \usage{
-check_pico(con)
+check_pico(con, master_node)
 }
 \arguments{
 \item{con}{Connection to soles project db}
+
+\item{master_node}{OSF node}
 }
 \description{
 This function checks the status of pico tables in a SOLES project and provides users the option of

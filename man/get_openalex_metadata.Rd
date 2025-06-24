@@ -4,10 +4,14 @@
 \alias{get_openalex_metadata}
 \title{Extract concepts, funder, citation count, institution and open access data from OpenAlex.}
 \usage{
-get_openalex_metadata(con)
+get_openalex_metadata(con, fill_table = NULL, n = 100)
 }
 \arguments{
 \item{con}{connection to db}
+
+\item{fill_table}{Name of database table to prioritise tagging}
+
+\item{n}{Number of studies to be tagged}
 }
 \value{
 Tables "discipline_tag", "funder_grant_tag", "institution_tag", "citation_count_tag", "retraction_tag", "article_type", oa_tag" will be updated with n number of new rows containing metadata. If no data is retrieved for these n citations, "Unknown" will be returned in the relevant columns.
@@ -19,5 +23,6 @@ This function retrieves meta-data.
 \dontrun{
 # Example usage:
 get_openalex_metadata(con)
+get_openalex_metadata(con, fill_table = "oa_tag", n = 200)
 }
 }

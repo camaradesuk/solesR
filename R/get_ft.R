@@ -8,12 +8,12 @@
 #' @param class_date screening date to filter by
 #' @param class_name screening name to filter by
 #' @param check_failed logical; check failed pdfs again?
-#' @param email email address required for unpaywall
+#' @param email email address required for UnPaywall
 #' @import dplyr
 #' @export
 #'
 
-get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_failed=FALSE, email=""){
+get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_failed=FALSE, email = ""){
   
   # Get citation data --------
   # get dois
@@ -50,6 +50,9 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
     included_no_ft <- included_no_ft %>%
       filter(name == class_name)
   }
+  
+  # make sure DOIs aren't duplicated
+  included_no_ft <- included_no_ft[!duplicated(included_no_ft$doi),]
   
   # get number of missing full texts
   n_missing <- nrow(included_no_ft)
@@ -98,12 +101,12 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
   try(upw_res <- suppressWarnings(suppressMessages(roadoi::oadoi_fetch(dois = to_find$doi, email=email))),silent=TRUE)
   
   if(exists("upw_res")){
-    
     # remove wiley, elsiever, sage to avoid errors
     upw_res <- upw_res %>%
       select(best_oa_location, doi, oa_status, publisher) %>%
       tidyr::unnest(cols = c(best_oa_location)) %>%
-      filter(!publisher %in% c("Wiley", "Elsevier BV"))
+      filter(!publisher %in% c("Wiley", "Elsevier BV", "SAGE Publications")) %>% 
+      filter(!grepl("tandfonline",url))
     
     # link back to get uid
     upw_res <- left_join(upw_res, included_no_ft, by="doi")
@@ -114,6 +117,12 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
     
     # fix doi slash to dollar sign
     upw_res$doi_fixed  <- fix_illegal_chars(upw_res$doi_fixed)
+    
+    # Fix if pdf url column is missing
+    if (!"url_for_pdf" %in% colnames(upw_res)) {
+      upw_res <- upw_res %>%
+        rename(url_for_pdf = url)  
+    }
     
     upw_res <- upw_res %>%
       mutate(pdf = paste0(path, "/", doi_fixed, ".pdf")) %>%
@@ -128,7 +137,6 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
   urls <- upw_res$url_for_pdf
   dest <- upw_res$pdf
   
-  #empty_file <- 0
   # Download texts from Unpaywall
   for (i in 1:length(urls)) {
     tryCatch(
@@ -151,8 +159,6 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
           file_size <- file.size(dest[i])
           
           if (file_size == 0){
-            
-            #empty_file <- empty_file + 1
             
             file.remove(dest[i])
             
@@ -206,12 +212,14 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
     df <- df %>%
       filter(!(doi %in% ids_with_both & content.type == "text/html"))
     
-    
     # filter out elsiever / wiley / acs (warnings)
     df <- df %>%
       filter(!grepl("elsevier",URL)) %>%
       filter(!grepl("wiley",URL)) %>%
-      filter(!grepl("pubs.acs.org",URL))
+      filter(!grepl("pubs.acs.org",URL)) %>% 
+      filter(!grepl("sagepub",URL)) %>% 
+      filter(!grepl("tandfonline",URL))
+    
     
   } else {df <- NULL}
   
@@ -240,8 +248,6 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
           file_size <- file.size(cr_dest[i])
           
           if (file_size == 0){
-            
-            #empty_file <<- empty_file + 1
             
             file.remove(cr_dest[i])
             
@@ -338,7 +344,6 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
   message("Found ", n_found, "/", nrow(to_find), " full texts. Writing to SOLES database...")
   
   dbWriteTable(con, "full_texts", pdfs_checked_now, overwrite=TRUE)
-  #cat(paste0("Empty Files: ", empty_file))
 }
 
 
@@ -420,7 +425,6 @@ wiley_ft <- function(doi, uid, token, path){
 #' @param token API token
 #' @param path where full texts should be stored
 elsevier_ft <- function(doi, uid, token, path){
-  
   doi <- gsub("\\/", "%2F", doi)
   uid  <- gsub("\\/", "%2F", uid)
   

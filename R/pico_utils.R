@@ -47,23 +47,27 @@ clean_regex_file <- function(regex_file) {
     select(-n)
 
   if(n_dup_names > 0) {
-
-    print(dup_names_tbl)
-    proceed_combineRegexes <- menu(c("Yes", "No"),
+    
+    # calling scope
+    tb <- .traceback(x = 0)
+    
+    # check if testthat or interactive
+    if(!any(unlist(lapply(tb, function(x) any(grepl("test_env", x))))) && interactive()) {
+      
+      print(dup_names_tbl)
+      
+      proceed_combineRegexes <- menu(c("Yes", "No"),
                                    title = message("Different RegEx that correspond to the same name/concept were found.
                                                    Should they be combined in one expression separated by an OR operator?"))
-
-    if (proceed_combineRegexes == "1") {
-      dat <- dat %>%
-        filter(!name %in% dup_names) %>%
-        bind_rows(correct_dup_names)
-
-    } else if(proceed_combineRegexes == "2") {
-
+      
+      if (proceed_combineRegexes == "1") {
+        
+        dat <- dat %>%
+          filter(!name %in% dup_names) %>%
+          bind_rows(correct_dup_names)
+        } 
+      }  
     }
-  } else {
-
-  }
 
 
   # find duplicate regex (different name) and optionally remove
@@ -79,19 +83,26 @@ clean_regex_file <- function(regex_file) {
   n_dup_regex <- length(unique(dup_regex_tbl$name))
 
   if(n_dup_regex > 0) {
-
-    print(dup_regex_tbl)
-
-    proceed_removeDupRegex <- menu(c("Yes", "No"),
+    
+    # calling scope
+    tb <- .traceback(x = 0)
+    
+    # check if called in testthat or interactive
+    if(!any(unlist(lapply(tb, function(x) any(grepl("test_env", x))))) && interactive()) {
+      
+      print(dup_regex_tbl)
+      
+      proceed_removeDupRegex <- menu(c("Yes", "No"),
                                    title = message("The above entries have duplicate RegEx that correspond to different names/concepts. Should duplicates be removed?
                                                Choosing 'Yes' will keep only the first occurrence of each duplicate RegEx"))
-
-    if (proceed_removeDupRegex == "1") {
-
-      dat <- dat %>%
-        group_by(type, regex, main_category, sub_category1, sub_category2) %>%
-        slice(1) %>%
-        ungroup()
+      
+      if (proceed_removeDupRegex == "1") {
+        
+        dat <- dat %>%
+          group_by(type, regex, main_category, sub_category1, sub_category2) %>%
+          slice(1) %>%
+          ungroup()
+      }
     }
   }
 
@@ -273,30 +284,41 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
   try_grepl <- function(pattern, name) {
     tryCatch(grepl(pattern, name, ignore.case = T, perl = T), error = function(err) NA)
   }
+  
+  try_detect <- function(name, pattern) {
+    tryCatch(stringr::str_detect(name, pattern), error = function(err) NA)
+  }
+  
+  correct_regex_nostr <- correct_regex %>% 
+    mutate(str_check = try_detect(name, regex)) %>% 
+    filter(is.na(str_check))
+  
+  correct_regex_str <- correct_regex %>% 
+    mutate(str_check = try_detect(name, regex)) %>% 
+    filter(!is.na(str_check))
 
   message("Checking for duplicates in new RegEx...")
 
   ontology_names <- unique(pico_o$name)
-
-  matched <- pico_o %>%
-    rename(area = id) %>%
-    left_join(pico_d, by = c("regex_id" = "id"), relationship = "many-to-many") %>%
-    mutate(match = grepl(pattern = paste(correct_regex$regex, collapse = '|'), x = name)) %>%
-    select(name, match, type, regex_id, regex, area) %>%
+  
+  matched <- pico_o %>% 
+    # rename(area = id) %>% 
+    left_join(pico_d, by = c("regex_id" = "id"), relationship = "many-to-many") %>% 
+    mutate(match = grepl(pattern = paste(correct_regex$regex, collapse = '|'), x = name)) %>% 
+    select(name, match, type, regex_id, regex) %>% 
     rename(type_ont = type,
            name_ont = name,
            id_ont = regex_id,
-           regex_ont = regex,
-           area_ont = area) %>%
+           regex_ont = regex) %>% 
     filter(match %in% TRUE)
 
-  regex_match <- matched %>%
-    fuzzyjoin::regex_right_join(correct_regex, by = c(name_ont = "regex")) %>%
-    rowwise() %>%
+  regex_match_str <- matched %>% 
+    fuzzyjoin::regex_right_join(correct_regex_str, by = c(name_ont = "regex")) %>% 
+    rowwise() %>% 
     mutate(match_type = case_when(type_ont != type  ~ FALSE,
-                                  type_ont == type  ~ TRUE)) %>%
-    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>%
-    ungroup() %>%
+                                  type_ont == type  ~ TRUE)) %>% 
+    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>% 
+    ungroup() %>% 
     mutate(
       is_likely_new = case_when(
         is.na(match) ~ TRUE,
@@ -307,8 +329,30 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
                          is_likely_new %in% TRUE & match_concept %in% TRUE & match_type %in% FALSE ~ TRUE,
                          is_likely_new %in% TRUE & match_concept %in% FALSE ~ TRUE,
                          is_likely_new %in% FALSE ~ FALSE)
-      ) %>%
-    filter(!is.na(name))
+    ) %>% 
+    filter(!is.na(name)) 
+  
+  regex_match_nostr <- correct_regex_nostr %>% 
+    fuzzyjoin::regex_left_join(matched, by = c("regex" = "name_ont")) %>% 
+    rowwise() %>% 
+    mutate(match_type = case_when(type_ont != type  ~ FALSE,
+                                  type_ont == type  ~ TRUE)) %>% 
+    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>% 
+    ungroup() %>% 
+    mutate(
+      is_likely_new = case_when(
+        is.na(match) ~ TRUE,
+        match %in% TRUE & match_type %in% FALSE ~ TRUE,
+        match %in% TRUE & match_type %in% TRUE ~ FALSE),
+      is_new = case_when(is.na(match) ~ TRUE,
+                         is_likely_new %in% TRUE & match_concept %in% TRUE & match_type %in% TRUE ~ FALSE,
+                         is_likely_new %in% TRUE & match_concept %in% TRUE & match_type %in% FALSE ~ TRUE,
+                         is_likely_new %in% TRUE & match_concept %in% FALSE ~ TRUE,
+                         is_likely_new %in% FALSE ~ FALSE)
+    ) %>% 
+    filter(!is.na(name)) 
+  
+  regex_match <- rbind(regex_match_str, regex_match_nostr)
 
   # retain only new regexes
   message("Removing RegEx that already exist in the soles database...")
@@ -373,18 +417,16 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
       slice_tail() %>%
       pull(id)
 
-    pico_new <- new_regex %>%
-      ungroup() %>%
-      mutate(id = seq(from = last_existing_id + 1, length.out = nrow(.))) %>%
-      mutate(area = NA)
+    pico_new <- new_regex %>% 
+      ungroup() %>% 
+      mutate(id = seq(from = last_existing_id + 1, length.out = nrow(.)))
 
     pico_d_new <- pico_new %>%
       select(id, regex)
 
-    pico_o_new <- pico_new %>%
-      rename(regex_id = id,
-             id = area) %>%
-      select(name, regex_id, type, main_category, sub_category1, sub_category2, id)
+    pico_o_new <- pico_new %>% 
+      rename(regex_id = id) %>%
+      select(name, regex_id, type, main_category, sub_category1, sub_category2)
 
     # add regex for new Unknown type
 
@@ -399,19 +441,19 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
       slice_tail() %>%
       pull(id)
 
-    unknown_o_new <- new_types %>%
-      tibble::as_tibble_col(column_name = "type") %>%
+  
+    unknown_o_new <- new_types %>% 
+      tibble::as_tibble_col(column_name = "type") %>% 
       mutate(regex_id = seq(from = last_unknown_id + 1, length.out = nrow(.)),
              name = str_to_title(paste("Unknown", str_replace(type, "_", " "))),
              main_category = "Unknown",
              sub_category1 = "Unknown",
-             sub_category2 = "Unknown",
-             id = NA) %>%
-      select(name, regex_id, type, main_category, sub_category1, sub_category2, id)
-
-    unknown_d_new <- unknown_o_new %>%
-      mutate(regex = "") %>%
-      select(regex_id, regex) %>%
+             sub_category2 = "Unknown") %>% 
+      select(name, regex_id, type, main_category, sub_category1, sub_category2)
+    
+    unknown_d_new <- unknown_o_new %>% 
+      mutate(regex = "") %>% 
+      select(regex_id, regex) %>% 
       rename(id = regex_id)
 
     # Upload new files to OSF -------------------------------------------------
@@ -462,13 +504,13 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
         lapply(ont_split, function(x) write.csv(x,
                                                 paste0("temp/", paste("regex_ontology", x$type[1], entry_id, user_id, format(Sys.Date(), "%d%m%y"), sep = "_"), ".csv"),
                                                 row.names = FALSE))
-
+        
         dict_2split <- pico_o_new %>%
-          select(-id) %>%
-          left_join(pico_d_new, by = c("regex_id" = "id")) %>%
-          rename(id = regex_id) %>%
+          select(-id) %>% 
+          left_join(pico_d_new, by = c("regex_id" = "id")) %>% 
+          rename(id = regex_id) %>% 
           select(id, regex, type)
-
+        
         dict_split <- split(dict_2split, dict_2split$type)
 
         lapply(dict_split, function(x) write.csv(x %>% select(-type),
@@ -530,6 +572,7 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 #' @import dplyr
 #' @import osfr
 #' @param con Connection to soles project db
+#' @param master_node OSF node
 #'
 #'
 #' @examples
@@ -541,7 +584,7 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 #' @export
 
 
-check_pico <- function(con) {
+check_pico <- function(con, master_node) {
 
   # clean temp dir
   if(!dir.exists("temp")) {
@@ -554,7 +597,7 @@ check_pico <- function(con) {
 
   # get latest pico tables from OSF
 
-  osfr::osf_retrieve_node("7wc2a") %>%
+  osfr::osf_retrieve_node(master_node) %>%
     osfr::osf_ls_files() %>%
     osfr::osf_download("temp")
 
@@ -626,4 +669,120 @@ check_pico <- function(con) {
   unlink("temp", recursive = TRUE)
 }
 
-
+#' Create Regular Expressions
+#'
+#' This function reads a file containing names and their corresponding alternate names,
+#' then creates regular expressions based on these names and alternate names.
+#'
+#' @param file Path to the input Excel file.
+#'
+#' @return A new Excel file with additional columns containing regular expressions.
+#'
+#' @import readxl
+#' @import dplyr
+#' @importFrom openxlsx write.xlsx
+#'
+#' @export
+#'
+#' @examples
+#' \dontrun{
+#' # Example usage:
+#' create_regex("input_file.xlsx")
+#' }
+#'
+create_regex <- function(file = ""){
+  
+  # Read in file
+  file_for_regex <- read.xlsx(file)
+  
+  # Splits the df in to 2, no_alternate_names and with_alternate_names
+  no_alternate_names <- file_for_regex %>%
+    filter(is.na(alternate_names) | alternate_names == "")
+  
+  # Function to create a regex from the "name" column
+  name_to_regex <- function(string) {
+    
+    # Split the sentence into words
+    words <- strsplit(string, "\\s")[[1]]
+    
+    # Initialize a vector to store transformed patterns
+    transformed_patterns <- character(length = length(words))
+    
+    # Escape any punctuation characters in the words
+    words <- gsub("([[:punct:]])", "\\\\\\1", words)
+    
+    # Iterate over each word
+    for (i in seq_along(words)) {
+      
+      # Check if the word starts with [a-z] (case-insensitive)
+      if (grepl("^[[:alpha:]]", words[i], ignore.case = TRUE)) {
+        
+        # Apply pattern transformation with word boundaries at both start and end
+        pattern <- paste0("[", toupper(substr(words[i], 1, 1)), tolower(substr(words[i], 1, 1)), "]", substr(words[i], 2, nchar(words[i])))
+        
+      } else {
+        
+        # If the word doesn't start with [a-z], keep it as it is
+        pattern <- words[i]
+        
+      }
+      
+      # Store the transformed pattern
+      transformed_patterns[i] <- pattern
+      
+    }
+    
+    # Combine transformed patterns into a single string
+    collapsed_pattern <- paste(transformed_patterns, collapse = "[\\s-]*")
+    
+    # Add word boundaries if the collapsed pattern starts with alphabetic character
+    if (grepl("^\\[[[:alpha:]]", collapsed_pattern, ignore.case = TRUE)) {
+      result <- paste0("\\b", collapsed_pattern, "\\b")
+    } else {
+      result <- collapsed_pattern
+    }
+    
+    return(result)
+    
+  }
+  
+  # Apply the name_to_regex function to each name in 'no_alternate_names'
+  no_alternate_names$regex <- sapply(no_alternate_names$name, name_to_regex)
+  
+  # Create a df that does have alternate names
+  with_alternate_names <- file_for_regex %>%
+    filter(!(is.na(alternate_names) | alternate_names == ""))
+  
+  # Apply the name_to_regex function to each name in 'with_alternate_names'
+  with_alternate_names$name_regex <- sapply(with_alternate_names$name, name_to_regex)
+  
+  # Second function to convert alternate_names to regex and collapse on "|"
+  convert_alternate_names <- function(names, separate_names_by = "\\|") {
+    
+    split_strings <- strsplit(names, separate_names_by)[[1]]
+    remove_ws <- trimws(split_strings)
+    words <- sapply(remove_ws, name_to_regex)
+    join_words <- paste(words, collapse = "|")
+    
+    return(join_words)
+  }
+  
+  # Apply convert_alternate_names function to the alternate names
+  with_alternate_names$regex_alternate_names <- sapply(with_alternate_names$alternate_names, convert_alternate_names)
+  
+  # Concatenates the "name_regex" and "regex_alternate_names" in to 1, separated by "|"
+  with_alternate_names$regex <- apply(with_alternate_names[, c("name_regex", "regex_alternate_names")], 1, function(x) paste(x, collapse = "|"))
+  
+  # Binds the 2 sections back together, no_alternate_names and with_alternate_names
+  file_with_regex <- with_alternate_names %>%
+    select(name, type, main_category, sub_category1, sub_category2, alternate_names, regex) %>%
+    rbind(no_alternate_names)
+  
+  # Create a new file name
+  new_file_name <- paste0("updated_regex_", file)
+  write.xlsx(file_with_regex, new_file_name)
+  
+  message(paste0("File updated with regex and written to working directory"))
+  message(paste0("File named: ", new_file_name))
+  
+}

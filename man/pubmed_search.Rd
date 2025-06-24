@@ -19,7 +19,7 @@ pubmed_search(query, timespan, retMax = 5000, format_soles = TRUE)
 a dataframe containing Web of Science search results
 }
 \description{
-A wrapper function for RISmed. Search PubMed using a query and retrieve results programmatically.
+A wrapper function for RISmed (https://github.com/kaitlynhair/RISmed). Search PubMed using a query and retrieve results programmatically.
 The timespan should be formatted as a number followed by the word "week" or "month", e.g. "1month" or "2week".
 One week is calculated as 7 days and one month is calculated as 31 days.
 }
