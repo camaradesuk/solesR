@@ -7,9 +7,12 @@
 run_k_fold(
   con,
   project_name = as.character(),
-  classifier_name = as.character(),
-  screening_decisions_review_id = as.character(),
-  fold_number = 5
+  sample = FALSE,
+  sample_number = as.numeric(),
+  file_id = "",
+  fold_number = 5,
+  repeats = 3,
+  validation_prop = 0.2
 )
 }
 \arguments{
@@ -17,11 +20,17 @@ run_k_fold(
 
 \item{project_name}{A string specifying the project name. Used for naming output files and directories.}
 
-\item{classifier_name}{A string representing the classifier's name.}
+\item{sample}{Boolean true/false based on whether you want to use all screening decisions or take a random sample.}
 
-\item{screening_decisions_review_id}{A string indicating the review ID for retrieving human screening decisions.}
+\item{sample_number}{An integer specifying the number of studies you want in the sample.}
+
+\item{file_id}{A string to be used as a file id to distinguish results, for repeat runs of this function on the same day.}
 
 \item{fold_number}{An integer specifying the number of folds for cross-validation. Default is 5.}
+
+\item{repeats}{An integer specifying how many repeats of the k-fold validation}
+
+\item{validation_prop}{A decimal between 0 and 1. The proportion of all of the screening decisions to be used for final validation. Set to 0 to use all studies for k-fold with no validation. Default is 0.2.}
 }
 \value{
 The function does not return an R object. It writes the results to the \code{k-fold-validation} directory.
@@ -52,9 +61,10 @@ Results are saved in a directory named \code{k-fold-validation} in the current w
 run_k_fold(
   con = db_con,
   project_name = "MS-SOLES",
-  classifier_name = "in-vivo",
-  screening_decisions_review_id = "ms-soles-screening",
-  fold_number = 5
+  sample = FALSE,
+  file_id = "_1",
+  fold_number = 5,
+  repeats = 3
 )
 }
 }

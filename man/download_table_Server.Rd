@@ -4,12 +4,14 @@
 \alias{download_table_Server}
 \title{Download table server}
 \usage{
-download_table_Server(id, table)
+download_table_Server(id, table, citations_for_dl)
 }
 \arguments{
 \item{id}{The module identifier.}
 
-\item{table}{}
+\item{table}{The filtered table which the user wishes to download}
+
+\item{citations_for_dl}{All of the included studies and metadata}
 }
 \description{
 This Shiny module server handles the server-side logic for downloading citation metadata

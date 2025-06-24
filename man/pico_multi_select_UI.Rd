@@ -13,6 +13,7 @@ pico_multi_select_UI(
   label1,
   label2,
   title = "",
+  selected,
   theme,
   spinner_colour
 )
