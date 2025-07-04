@@ -10,7 +10,9 @@
 #' 
 get_recent_citations <- function(con, prev_months = prev_months){
   
+  # Get oldest date using previous months
   older_month <- Sys.Date()-(30*prev_months)
+  # Get today's date
   current_date <- Sys.Date()
   
   # Generate a sequence of dates at the start of each month within the range
@@ -18,8 +20,11 @@ get_recent_citations <- function(con, prev_months = prev_months){
                              to = as.Date(cut(current_date, "month")),
                              by = "months")
   
+  # Create regex for finding dates
   regex_pattern <- paste(format(dates_sequence, "%m%y"), collapse = '|')
+  # Write database query to retrieve records matching dates
   query <- paste0('SELECT * FROM unique_citations WHERE date ~ \'(', regex_pattern, ')\'')
+  # Query database
   recent_citations_in_db <- dbGetQuery(con, query)
   
   # edit source for dedup - in database already
@@ -50,30 +55,36 @@ get_new_unique <- function(con, new_citations, prev_months=2){
     citations <- rbind(new_citations, old_citations)
   }
   
+  # Rename columns
   citations$isbn <- citations$issn 
   citations$label <- citations$date
   citations$record_id <- citations$uid
   
+  # Batch data where too large
   if(length(citations$record_id) > 50000){
     
     message("Splitting up dataframe and running multiple deduplications due to size...")
     
     deduplicated_dataframes <- list()
     
+    # Arrange for batched dedup
     citations <- citations %>%
       arrange(.data$year, .data$title, .data$author)
     
+    # Split for batched dedup
     split_citations <- split(citations, ceiling(seq(nrow(citations))/50000))
     
+    # Perform dedup on batches
     for(i in 1:length(split_citations)){
       
-      # Perform deduplication for the current year's citations
+      # Perform deduplication for the batched data
       dedup_results <- ASySD::dedup_citations(split_citations[[i]], merge_citations = TRUE, keep_source = "in_db_already")
       
       # Append deduplicated results to the list
       deduplicated_dataframes[[i]] <- dedup_results$unique
     } 
     
+    # Bind rows
     dedup_results <- bind_rows(deduplicated_dataframes)
     
     # get unique citations
@@ -81,6 +92,7 @@ get_new_unique <- function(con, new_citations, prev_months=2){
     
   } else {
     
+    # Dedup single batch
     dedup_results <- ASySD::dedup_citations(citations, merge_citations = TRUE, keep_source = "in_db_already")
     
     # get unique citations
@@ -91,15 +103,18 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   # fix DOIs
   new_unique <- format_doi(new_unique)
   
+  # Set date
   date <- format(Sys.Date(), "%d%m%y")
   
-  
+  # Handle where no duplicates found
   if (!("record_ids" %in% colnames(new_unique))) {
     
     warning("No duplicates detected... returning original dataframe")
-    # ensure date is present
+    
+    # Change column name
     new_unique$issn <- new_unique$isbn
     
+    # Select relevant columns
     new_unique <- new_unique %>%
       select(.data$uid, .data$source, .data$author, .data$year, .data$journal, 
              .data$doi, .data$title, .data$pages, .data$volume, .data$abstract, 
@@ -107,13 +122,14 @@ get_new_unique <- function(con, new_citations, prev_months=2){
              .data$date, .data$issn, .data$pmid, .data$ptype, .data$source, 
              .data$author_country, .data$number, .data$author_affiliation)
     
+    # Get records in DB already
     new_unique <- new_unique %>%
       filter(!grepl("in_db_already", .data$source))
     
     return(new_unique)
   }
   
-  message("updating citation source match table with new identifiers...")
+  message("Updating citation source match table with new identifiers...")
   
   # # keep accession info
   matching_ids <- new_unique %>%
@@ -162,10 +178,10 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   
   dbWriteTable(con, "citation_source_match", match_comb, overwrite=TRUE)
   
-  message("formatting unique citations dataframe...")
+  message("Formatting unique citations dataframe...")
   date <- format(Sys.Date(), "%d%m%y")
   
-  # ensure date is present
+  # Change column names
   new_unique$issn <- new_unique$isbn
   
   new_unique <- new_unique %>%
@@ -177,7 +193,7 @@ get_new_unique <- function(con, new_citations, prev_months=2){
   
   new_unique <- new_unique %>%
     filter(!grepl("in_db_already", .data$source)) 
-  message(paste0("identified ", nrow(new_unique), " new unique citations"))
+  message("Identified ", nrow(new_unique), " new unique citations")
   
   return(new_unique)
   
@@ -296,7 +312,7 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
   res_manual <- format_doi(res_manual) 
   date <- format(Sys.Date(), "%d%m%y")
   
-  message("updating citation source match table with new identifiers...")
+  message("Updating citation source match table with new identifiers...")
   
   # # keep accession info
   matching_ids <- res_unique %>%
@@ -326,7 +342,7 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
     unique() %>%
     ungroup()
   
-  message("formatting unique citations dataframe...")
+  message("Formatting unique citations dataframe...")
   date <- format(Sys.Date(), "%d%m%y")
   
   # ensure date is present
@@ -339,7 +355,7 @@ dedup_first_search <- function(citations, arrange_by = NULL, keep_source="pubmed
            .data$date, .data$issn, .data$pmid, .data$ptype, .data$source, 
            .data$author_country, .data$number, .data$author_affiliation)
   
-  message(paste0("identified ", nrow(res_unique), " unique citations"))
+  message("Identified ", nrow(res_unique), " unique records")
   
   # catch to ensure all dois are lower case
   res_unique$doi <- tolower(res_unique$doi)
