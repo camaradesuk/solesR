@@ -2,7 +2,7 @@
 % Please edit documentation in R/get_missing_metadata.R
 \name{get_missing_abstracts}
 \alias{get_missing_abstracts}
-\title{Fill in missing abstracts via crossref}
+\title{Fill in missing abstracts via CrossRef}
 \usage{
 get_missing_abstracts(
   citations,
@@ -12,17 +12,17 @@ get_missing_abstracts(
 )
 }
 \arguments{
-\item{citations}{citations you want to find abstracts for}
+\item{citations}{a dataframe containing records missing abstract text data}
 
-\item{abstract_col}{the name of the column that contains the abstract information. Default: \code{abstract}}
+\item{abstract_col}{the name of the column that should contain the abstract text. Default: \code{abstract}}
 
-\item{doi_col}{the name of the column that contains the doi information. Default: \code{doi}}
+\item{doi_col}{the name of the column that contains the DOI. Default: \code{doi}}
 
 \item{id_col}{a unique identifier column. For SyRF output this could be \code{CustomId}. Default: \code{uid}}
 }
 \value{
-citations dataframe with abstracts (where feasible)
+The same dataframe entered as citations with additional abstracts entered where these could be retrieved by CrossRef
 }
 \description{
-This function pulls in missing abstracts
+Search records in CrossRef using DOI to attempt to retrieve missing abstract text.
 }

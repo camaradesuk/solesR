@@ -10,8 +10,8 @@ get_missing_dois(citations)
 \item{citations}{citations you want to find dois for}
 }
 \value{
-citations with dois (where feasible)
+Dataframes with additional DOIs found by OpenAlex
 }
 \description{
-This function pulls in missing dois from OpenAlex
+Uses title matching to retrieve DOI information from OpenAlex
 }
