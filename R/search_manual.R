@@ -572,9 +572,20 @@ process_pubmed <- function(path) {
 
   # Create unique identifiers
   newdat <- newdat %>%
-    dplyr::mutate(uid = paste0("pubmed-", record_id)) %>%
-    dplyr::mutate(pmid = record_id) %>%
-    dplyr::mutate(doi = ifelse(is.na(doi), stringr::str_extract(article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), doi))
+    dplyr::mutate(
+      uid = paste0("pubmed-", record_id),
+      pmid = record_id,
+      doi = ifelse(
+        !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
+        stringr::str_extract(article_ids, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        doi
+      ),
+      doi = ifelse(
+        !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
+        stringr::str_extract(local_identifier, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        doi
+      )
+    )
 
   # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
