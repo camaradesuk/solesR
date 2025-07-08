@@ -2596,8 +2596,7 @@ evidence_map_Server <- function(id,
         
         # When switch is used render plot flag to FALSE and disable render button
         render_plot(FALSE)
-        shinyjs::disable("render_evidence_map")
-        
+
         # Update UI dynamically
         output$picker_inputs_ui <- renderUI({
           
@@ -2855,7 +2854,7 @@ evidence_map_Server <- function(id,
             distinct(.data[[x_axis_specific_column]]) %>%
             arrange(.data[[x_axis_specific_column]]) %>%
             pull(.data[[x_axis_specific_column]])
-
+          
           # Only update picker input's `choices` and `selected` if the main category changes
           updatePickerInput(session, "x_axis_specific_select",
                             choices = sort(x_axis_distinct),
@@ -2895,7 +2894,7 @@ evidence_map_Server <- function(id,
             distinct(.data[[legend_specific_column]]) %>%
             arrange(.data[[legend_specific_column]]) %>%
             pull(.data[[legend_specific_column]])
-
+          
           # Only update picker input's `choices` and `selected` if the main category changes
           updatePickerInput(session, "legend_specific_select",
                             choices = sort(legend_distinct),
@@ -2925,13 +2924,14 @@ evidence_map_Server <- function(id,
         updatePickerInput(session, "y_axis_maincat_select", selected = sort(unique(y_axis_table[[y_axis_group_column]])))
         updatePickerInput(session, "x_axis_maincat_select", selected = sort(unique(x_axis_table[[x_axis_group_column]])))
         updatePickerInput(session, "legend_maincat_select", selected = sort(unique(legend_table[[legend_group_column]])))
-        updatePickerInput(session, "y_axis_specific_select", selected = NULL)
-        updatePickerInput(session, "x_axis_specific_select", selected = NULL)
-        updatePickerInput(session, "legend_specific_select", selected = NULL)
+        updatePickerInput(session, "y_axis_specific_select", selected = character(0))
+        updatePickerInput(session, "x_axis_specific_select", selected = character(0))
+        updatePickerInput(session, "legend_specific_select", selected = character(0))
         
         # enable render button, set render plot flag to FALSE & click info to NULL
         shinyjs::enable("render_evidence_map")
         render_plot(FALSE)                       
+        
         
         #output$evidence_map_plot <- renderPlotly(NULL)
         click_bubble(NULL)
@@ -2998,11 +2998,8 @@ evidence_map_Server <- function(id,
         
         click <- event_data("plotly_click", priority = "event", source = "B")
         
-        if (!is.null(click)) {
-          
-          # Store the latest click in the reactiveVal
-          click_bubble(click)  
-        }
+        click_bubble(click)
+        
         
         return(click)
       })
@@ -3220,7 +3217,6 @@ evidence_map_Server <- function(id,
           
           "Please make selections and click 'Render Plot' to view!<br><br>Click on a bubble to see the corresponding studies."
           
-          
         } else {
           
           ""
@@ -3424,7 +3420,7 @@ evidence_map_Server <- function(id,
                     )
                   })
                 
-                )
+                ) 
               return(p)
             }, error = function(e) {
               
