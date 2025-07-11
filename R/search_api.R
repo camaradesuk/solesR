@@ -81,6 +81,8 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
       dplyr::filter(!is.na(.data$scopusID))
   }
 
+  # Change no abstract available to NA
+  scopus_results$abstract <- gsub("^\\[No abstract available\\]$", "", scopus_results$abstract)
   # Change all "NA" to real NA
   scopus_results[scopus_results == "NA"] <- NA
   # Change all blanks to NA
@@ -231,6 +233,8 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
       dplyr::filter(!is.na(.data$ut))
   }
 
+  # Change no abstract available to NA
+  wos_results$abstract <- gsub("^\\[No abstract available\\]$", "", wos_results$abstract)
   # Change all "NA" to real NA
   wos_results[wos_results == "NA"] <- NA
   # Change all blanks to NA
@@ -363,6 +367,8 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
       dplyr::filter(!is.na(.data$pmid))
   }
 
+  # Change no abstract available to NA
+  pubmed_results$abstract <- gsub("^\\[No abstract available\\]$", "", pubmed_results$abstract)
   # Change all "NA" to real NA
   pubmed_results[pubmed_results == "NA"] <- NA
   # Change all blanks to NA

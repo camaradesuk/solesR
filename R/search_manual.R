@@ -60,6 +60,16 @@ manual_upload <- function(paths, source) {
   # Call the processing function based on the data source
   combined_data <- process_manual_upload(manual_process_functions[[source]])
   
+  # Change no abstract available to NA
+  combined_data$abstract <- gsub("^\\[No abstract available\\]$", "", combined_data$abstract)
+  # Change all "NA" to real NA
+  combined_data[combined_data == "NA"] <- NA
+  # Change all blanks to NA
+  combined_data[combined_data == ""] <- NA
+  
+  # Make DOI lowercase
+  combined_data$doi <- tolower(combined_data$doi)
+  
   # Return data
   return(combined_data)
 }
