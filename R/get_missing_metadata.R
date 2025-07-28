@@ -1,19 +1,24 @@
-#' Fill in missing abstracts via crossref
+#' Fill in missing abstracts via CrossRef
 #'
-#' This function pulls in missing abstracts
+#' Search records in CrossRef using DOI to attempt to retrieve missing abstract text.
 #'
-#' @param citations citations you want to find abstracts for
-#' @param abstract_col the name of the column that contains the abstract information. Default: `abstract`
-#' @param doi_col the name of the column that contains the doi information. Default: `doi`
+#' @param citations a dataframe containing records missing abstract text data
+#' @param abstract_col the name of the column that should contain the abstract text. Default: `abstract`
+#' @param doi_col the name of the column that contains the DOI. Default: `doi`
 #' @param id_col a unique identifier column. For SyRF output this could be `CustomId`. Default: `uid`
-#' @return citations dataframe with abstracts (where feasible)
-#' @export
+#' 
+#' @return The same dataframe entered as citations with additional abstracts entered where these could be retrieved by CrossRef
+#' 
 #' @import rcrossref
 #' @import stringr
+#' @import rlang
+#' @import dplyr
+#' 
+#' @export
 
 get_missing_abstracts <- function(citations, abstract_col = "abstract", doi_col = "doi", id_col = "uid"){
   
-  # column name checks
+  # Check the required column names exist and stop the function with error if not
   if(!abstract_col %in% colnames(citations)) {
     stop("Column ", abstract_col, " does not exist. Is the column name correct?")
   }
@@ -26,75 +31,141 @@ get_missing_abstracts <- function(citations, abstract_col = "abstract", doi_col 
     stop("Column ", id_col, " does not exist. Is the column name correct?")
   }
   
+  # Make all NA real NAs
+  citations[citations == "NA" ] <- NA
+  citations[citations == "" ] <- NA
+  
+  # Check each record has an ID (no NA values)
+  if(sum(is.na(citations[[id_col]])) > 0){
+    stop(message("Column ", id_col, " does not contain a unique identifier for each record. Please ensure each record has a unique identifier."))
+  }
+  
+  # Rename columns for internal function use
+  citations <- citations %>%
+    rename(abstract := {{ abstract_col }},
+           doi := {{ doi_col }},
+           uid := {{ id_col }})
+  
+  # Subset records that do not have an abstract
+  new_unique_no_abstract <- citations %>%
+    filter(stringr::str_length(citations$abstract) < 100 | is.na(citations$abstract))
+  
+  # Print number of records missing an abstract to the console
+  message(nrow(new_unique_no_abstract), " records with no abstract.")
+  
+  # Check records missing an abstract have a DOI
+  if (nrow(new_unique_no_abstract) > 1) {
+    new_unique_no_abstract <- new_unique_no_abstract %>%
+      # Remove records without a DOI
+      filter(!is.na(doi)) %>%
+      # Remove empty abstract column
+      select(-abstract)
+    
+    # Print number of records with a DOI
+    message(nrow(new_unique_no_abstract), " records with no abstract have a DOI.")
+  }
+  
+  # # Stop function if there are no missing abstracts
+  if (nrow(new_unique_no_abstract) < 1) {
+    stop(message("No more abstracts to find!"))
+  }
+  
+  # Print process to console
+  message("Trying to retrieve abstracts from CrossRef using DOI...")
+  
+  # Run function over each row of data missing abstracts
+  abstract_result <- lapply(seq_len(nrow(new_unique_no_abstract)), function(i) {
+    # Get doi and id
+    doi = new_unique_no_abstract$doi[i]
+    uid = new_unique_no_abstract$uid[i]
+    # Attempt to retrieve data from CrossRef
+    tryCatch(
+      {
+        result <- rcrossref:: cr_abstract(doi)
+        message(sprintf("Found abstract for DOI '%s'", doi))
+        list(
+          doi = doi,
+          uid = uid,
+          abstract = result,
+          error = NA
+        )
+      },
+      error = function(e) {
+        message(sprintf("Error with DOI '%s': %s", doi, e$message))
+        list(
+          doi = doi,
+          uid = uid,
+          abstract = NA,
+          error = e$message
+        )
+      }
+    )
+  })
+  
+  # Unlist result (call and dois)
+  abstracts_df <- as.data.frame(do.call(rbind, abstract_result)) %>%
+    # Remove error column
+    select(-error) %>%
+    # Remove results where abstract was not retrieved
+    filter(!is.na(abstract)) %>%
+    # Make all data character type
+    mutate(across(everything(), as.character)) %>%
+    # Remove additional white space from abstract
+    mutate(abstract = str_squish(abstract)) %>%
+    # Make DOI lower case
+    mutate(doi = tolower(doi)) %>%
+    left_join(new_unique_no_abstract, by = c("doi", "uid"))
+  
+  # Bind new data with existing
+  if (nrow(abstracts_df) > 0) {
+    citations_updated <- citations %>%
+      filter(!uid %in% abstracts_df$uid) %>%
+      rbind(abstracts_df)
+  } else {
+    citations_updated <- citations
+  }
+  
+  # Rename columns for output
+  citations_updated <- citations_updated %>%
+    rename({{ abstract_col }} := abstract,
+           {{ doi_col }} := doi,
+           {{ id_col }} := uid)
+  
+  # Make sure all NA real NAs
+  citations_updated[citations_updated == "NA" ] <- NA
+  citations_updated[citations_updated == "" ] <- NA
+  
+  # Subset records still missing an abstract
+  still_no_abstract <- citations_updated[which(stringr::str_length(citations_updated[[abstract_col]]) < 100 |
+                                                 is.na(citations_updated[[abstract_col]])),]
+  
+  # Print number missing an abstract to the console
+  message(length(still_no_abstract[[id_col]]), " records still with no abstract")
+  
+  
   # get studies with no abstract
   new_unique_no_abstract <- citations[which(stringr::str_length(citations[[abstract_col]]) < 100 |
                                               is.na(citations[[abstract_col]])),]
   
   message(nrow(new_unique_no_abstract), " records with no abstract")
   
-  # get vector of DOIs
-  dois <- new_unique_no_abstract[[doi_col]]
+  # Return dataset with added abstract text
+  invisible(return(citations_updated))
   
-  # Print message
-  message("Attempting to retrieve missing abstract information from CrossRef...")
-  
-  # get abstracts from crossref
-  abstract_result <- lapply(dois, function(z) tryCatch(rcrossref::cr_abstract(z), error = function(e) e))
-  
-  # format abstract dataframe
-  abstracts_df <- do.call(rbind, abstract_result)
-  abstracts_df <- as.data.frame(abstracts_df)
-  abstracts_df <- cbind(abstracts_df, dois)
-  abstracts_df <- as.data.frame(abstracts_df)
-  
-  abstracts_df <- abstracts_df %>%
-    mutate(abstract = ifelse(call == "NULL", NA, paste0(call))) %>%
-    mutate(abstract = ifelse(call == "nchar(hh)", NA, paste0(abstract))) %>%
-    mutate(doi = as.character(dois)) %>%
-    dplyr::select(abstract, doi)
-  
-  abstracts_df <- abstracts_df %>% 
-    rename({{ abstract_col }} := abstract) %>% 
-    rename({{ doi_col }} := doi)
-  
-  # bind new abstracts to existing df
-  new_unique_no_abstract <- new_unique_no_abstract %>%
-    dplyr::select(-{{ abstract_col }})
-  
-  new_unique_no_abstract <- suppressWarnings(left_join(abstracts_df,
-                                                       new_unique_no_abstract,
-                                                       by = quo_name(doi_col))) 
-  
-  new_unique_no_abstract <- unique(new_unique_no_abstract)
-  
-  citations <- citations[which(!citations[[id_col]] %in% new_unique_no_abstract[[id_col]]),]
-  
-  citations <- rbind(citations, new_unique_no_abstract)
-  
-  # make all NA real NAs
-  citations[citations == "NA" ] <- NA
-  citations[citations == "" ] <- NA
-  
-  still_no_abstract <- citations[which(stringr::str_length(citations[[abstract_col]]) < 100 |
-                                         is.na(citations[[abstract_col]])),]
-  
-  
-  message(length(still_no_abstract[[id_col]]), " records still with no abstract")
-  
-  return(citations)
 }
 
 #' Fill in missing DOIs
 #'
-#' This function pulls in missing dois from OpenAlex
+#' Uses title matching to retrieve DOI information from OpenAlex
 #'
 #' @param citations citations you want to find dois for
-#' @return citations with dois (where feasible)
+#' @return Dataframes with additional DOIs found by OpenAlex
 #' @export
 #' @import fuzzyjoin
 #' @importFrom plyr rbind.fill
 #' @import openalexR
 #' @import dplyr
+#' @import stringr
 get_missing_dois <- function(citations){
   
   # Check input is dataframe
@@ -107,13 +178,16 @@ get_missing_dois <- function(citations){
     stop("Data frame does not contain all necessary columns: doi, uid, title, authors, pages, journal")
   }
   
+  # Subset rows where DOI is missing and title is non-specific or short
   citations_no_doi <- citations  %>%
     # Remove no DOI
     filter(is.na(doi)|doi=="") %>%
     # Remove no title
     filter(!is.na(title)) %>%
     # Remove non-specific titles
-    filter(!title %in% c("Preface", "Foreword"))
+    filter(!title %in% c("Preface", "Foreword")) %>%
+    # Remove short titles
+    filter(stringr::str_length(citations$title) >= 25) %>%
   
   # Print number missing DOI
   message(length(citations_no_doi$uid), " records with no doi")
@@ -125,10 +199,10 @@ get_missing_dois <- function(citations){
   }
   
   # Print message
-  message("Attempting to retrieve missing abstract information from OpenAlex...")
+  message("Attempting to retrieve missing DOI information from OpenAlex...")
   
   # Set result object to NULL
-  res <- NULL
+  results <- NULL
   
   # Loop over unique records
   for(i in 1:length(citations_no_doi$uid)){
@@ -141,23 +215,29 @@ get_missing_dois <- function(citations){
     
     # Bind results together
     if(is.data.frame(new)){
-      res <- plyr::rbind.fill(res, new)
+      # Print success message to console
+      message(sprintf("Success: Potential DOI fetched for title: '%s'", citations_no_doi$title[i]))
+      # If records retrieved, bind result to object
+      results <- plyr::rbind.fill(results, new)
+    } else {
+      # Print failure message to console
+      message(sprintf("Error: No data fetched for title: '%s'", citations_no_doi$title[i]))
     }
   }
   
   # Print message
-  if(is.null(res)){
+  if(is.null(results)){
     message("No additional DOIs found")
     return(citations)
   }
   
   # If both title and display_name columns exist then keep display_name
-  if(all(c("title","display_name") %in% colnames(res))) {
-    res <- res %>% select(-title)
+  if(all(c("title","display_name") %in% colnames(results))) {
+    results <- results %>% select(-title)
   }
   
   # Perform fuzzy matching
-  match <- fuzzyjoin::stringdist_left_join(citations_no_doi, res, max_dist = 4, by = c("title" = "display_name"), ignore_case=TRUE)
+  match <- fuzzyjoin::stringdist_left_join(citations_no_doi, results, max_dist = 4, by = c("title" = "display_name"), ignore_case=TRUE)
   
   # Try to match based on other metadata
   try(correct_doi <- match %>%
