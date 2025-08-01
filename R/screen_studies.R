@@ -227,7 +227,8 @@ run_ml <- function(con, training_set, unscreened_set, project_name, classifier_n
 #' @param file_id A string to be used as a file id to distinguish results, for repeat runs of this function on the same day.
 #' @param fold_number An integer specifying the number of folds for cross-validation. Default is 5.
 #' @param repeats An integer specifying how many repeats of the k-fold validation
-#' @param validation_prop A decimal between 0 and 1. The proportion of all of the screening decisions to be used for final validation. Set to 0 to use all studies for k-fold with no validation. Default is 0.2.
+#' @param training_prop A decimal between 0 and 1. The proportion of all of the screening decisions to be used for training. Set to 1 to use all studies for k-fold with no validation. Default is 0.8.
+#' @param classifier_name A string specifying the classifier name to be used, taken from the study_classification table (e.g. "in-vivo", "in-vitro", "clinical")
 #' @details
 #' This function:
 #' 1. Retrieves included and excluded screening decisions from the database.
@@ -249,7 +250,8 @@ run_ml <- function(con, training_set, unscreened_set, project_name, classifier_n
 #'   sample = FALSE,
 #'   file_id = "_1",
 #'   fold_number = 5,
-#'   repeats = 3
+#'   repeats = 3,
+#'   classifier_name = "animal"
 #' )
 #' }
 #' @return
@@ -264,7 +266,8 @@ run_k_fold <- function(con,
                        file_id = "",
                        fold_number = 5,
                        repeats = 3,
-                       validation_prop = 0.2) {
+                       training_prop = 0.8,
+                       classifier_name = NULL) {
   
   # Create folders for saving data
   data_folder <- "k-fold-validation/"
@@ -280,10 +283,10 @@ run_k_fold <- function(con,
   source("/opt/sharedFolder/SSML/JT_API_config.R")
   source("/opt/sharedFolder/SSML/JT_API_wrap.R")
   
-  
   # Retrieve screening decisions from db
   message("Retrieving human screening decisions from the database...")
-  screening_decisions <- get_screening_decisions(con, project_name)
+  screening_decisions <- get_screening_decisions(con, project_name, classifier_name = classifier_name)
+  
   
   # Set seed and shuffle
   set.seed(123)
@@ -295,28 +298,19 @@ run_k_fold <- function(con,
       sample_n(sample_number)
   }
   
-  # If the user does not want to use a final validation set validation_prop should equal 0
-  if (validation_prop == 0){
+  # If the user does not want to use a final validation set training_prop should equal 1
+  if (training_prop == 1){
     
     training_set <- screening_decisions
-    
-    date <- format(Sys.Date(), "%d%m%y")
-    
-    write.csv(training_set, paste0(data_output, "kfold_training_set_", date, file_id, ".csv"), row.names = F)
     
   } else {
     
     # Split in to stratified split for training & validation
-    # K-fold is then performed on the training data and a set held out for final validation. Default is 0.2
-    split <- rsample::initial_split(screening_decisions, prop = validation_prop, strata = "LABEL")
+    # K-fold is then performed on the training data and a set held out for final validation. Default is 0.8
+    split <- rsample::initial_split(screening_decisions, prop = training_prop, strata = "LABEL")
     
     training_set <- training(split)
     validation_set  <- testing(split)
-    
-    date <- format(Sys.Date(), "%d%m%y")
-    
-    write.csv(training_set, paste0(data_output, "kfold_training_set_", date, file_id, ".csv"), row.names = F)
-    write.csv(validation_set, paste0(data_output, "kfold_validation_set_", date, file_id, ".csv"), row.names = F)
     
   }
   
@@ -352,10 +346,17 @@ run_k_fold <- function(con,
     }
   }
   
+  
+  date <- format(Sys.Date(), "%d%m%y")
+  
   # Bind all folds and repeats into 1 dataframe
   set <- do.call(rbind, all_folds) %>%
     mutate(date = date) %>% 
     mutate(TEMP_ID = row_number())
+  
+  training_set <- set %>% 
+    filter(n_repeat == 1) %>% 
+    select(-fold, -n_repeat, -date)
   
   # Get the max TEMP_ID from the full set
   max_temp_id <- max(set$TEMP_ID, na.rm = TRUE)
