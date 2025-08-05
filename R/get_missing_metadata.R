@@ -187,7 +187,7 @@ get_missing_dois <- function(citations){
     # Remove non-specific titles
     filter(!title %in% c("Preface", "Foreword")) %>%
     # Remove short titles
-    filter(stringr::str_length(citations$title) >= 25) %>%
+    filter(stringr::str_length(citations$title) >= 25)
   
   # Print number missing DOI
   message(length(citations_no_doi$uid), " records with no doi")
