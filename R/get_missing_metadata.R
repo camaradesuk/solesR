@@ -258,7 +258,6 @@ get_missing_dois <- function(citations){
         mutate(jour_match = ifelse(jour_match > 0.5, "yes", "no")) %>%
         mutate(final_match = ifelse(page_match== "yes" & auth_match == "yes", "match",  "check")) %>%
         mutate(final_match = ifelse(page_match== "yes" & jour_match == "yes", "match", paste(final_match))) %>%
-        mutate(final_match = ifelse(auth_match == "yes" & jour_match == "yes", "match",  paste(final_match))) %>%
         mutate(final_match = ifelse(auth_match == "no" & jour_match == "no" & page_match == "no", "not_match", paste(final_match))) %>%
         filter(final_match == "match") %>%
         select(uid, new_doi) %>%
