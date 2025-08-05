@@ -23,6 +23,25 @@
 
 get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
+  # Check con contains connection info
+  if(class(con) != "PqConnection"){
+    stop("'con' is not a valid database connection")
+  }
+  
+  # Check fill_table input is valid
+  if(!is.null(fill_table)){
+    if (!(fill_table %in% c(
+      "funder_grant_tag", 
+      "disciline_tag", 
+      "institution_tag", 
+      "citation_count_tag", 
+      "retraction_tag", 
+      "article_type", 
+      "oa_tag"))) {
+      stop("'fill_table' is not valid database table name.")
+    }
+  }
+  
   # if table doesn't exist, create it ----
   if (!dbExistsTable(con, "funder_grant_tag")) {
     
