@@ -189,13 +189,13 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     
   }
   
-  print(paste0(length(citations_missing_data$doi), " records left to tag!"))
+  message(length(citations_missing_data$doi), " records left to tag!")
   
   if(length(citations_missing_data$doi) < 1) {
     message("Done!")
     return(citations_missing_data)
   } else if(length(citations_missing_data$doi) > n) {
-    message(paste0("Tagging the first ", n,  " records..."))
+    message("Tagging the first ", n,  " records...")
     citations_missing_data <- citations_missing_data[1:n,]
   } else {
     message("Tagging all remaining records...")
@@ -205,18 +205,27 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   # Use the doi's with no discipline (which should also have no funder data) to search OpenAlex
   res <- NULL
   
-  # Create a dataframe with data from openAlex ----
+  #  Query OpenAlex using DOI
   for(i in 1:length(citations_missing_data$doi)){
-    suppressWarnings({
-      
-      try(new <- openalexR::oa_fetch(
-        identifier = NULL,
-        entity = "works",
-        doi = citations_missing_data$doi[i]),silent=TRUE)
-    })
+    
+    # Try to retrieve information using title search
+    try(new <- openalexR::oa_fetch(
+      entity = "works",
+      doi = citations_missing_data$doi[i]),
+      silent = T)
+    
+    # Bind results together
     if(is.data.frame(new)){
-      res <- bind_rows(res, new)
+      # Print success message to console
+      message(sprintf("Success: Found OpenAlex data for DOI: '%s'", citations_missing_data$doi[i]))
+      # If records retrieved, bind result to object
+      res <- plyr::rbind.fill(res, new)
+    } else {
+      # Print failure message to console
+      message(sprintf("Error: No data fetched for DOI: '%s'", citations_missing_data$doi[i]))
     }
+    
+    
   }
   
   if(is.null(res)){
@@ -227,9 +236,16 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
   # Unnest author data, and extract institution info ----
   res_institution <- res %>% 
-    unnest(author) %>%
-    filter(author_position == "first") %>%
-    select(doi, institution_id, name = institution_display_name, ror = institution_ror, institution_country_code, type = institution_type) %>%
+    unnest(authorships, names_sep = "_") %>%
+    filter(authorships_author_position == "first") %>%
+    rename(affiliations = authorships_affiliations) %>%
+    unnest(affiliations, names_sep = "_") %>%
+    select(doi, 
+           institution_id = affiliations_id, 
+           name = affiliations_display_name, 
+           ror = affiliations_ror, 
+           institution_country_code = affiliations_country_code, 
+           type = affiliations_type) %>%
     mutate(institution_country_code = toupper(institution_country_code), 
            doi = str_remove(doi, "https://doi.org/"),
            method = "OpenAlex") %>%
@@ -368,10 +384,6 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     mutate(is_oa = NA, oa_status = "Unknown", method = "OpenAlex")
   
   res_oa <- rbind(res_oa, res_oa_failed)
-  
-  if (nrow(res_oa > 0)){
-    res_oa$method = "OpenAlex"
-  }
   
   res_article <- res %>% 
     select(doi, language, type, is_paratext) %>% 
