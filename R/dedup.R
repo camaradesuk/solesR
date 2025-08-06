@@ -56,13 +56,28 @@ get_recent_citations <- function(con, prev_months = prev_months){
 #' @return recent citations 
 #' @export
 #' 
-get_new_unique <- function(con, new_citations, prev_months=2){
+get_new_unique <- function(con, new_citations, prev_months = 2){
+  
+  # Check con contains connection info
+  if(!inherits(con, "PqConnection")){
+    stop("'con' is not a valid database connection")
+  }
+  
+  # Check input is dataframe
+  if(!is.data.frame(new_citations)){
+    stop("Input is not a data frame")
+  }
+  
+  # Check prev_months input is numeric
+  if(!is.numeric(prev_months)){
+    stop("'prev_months' should be numeric")
+  }
   
   if(prev_months == 0){
     citations <- new_citations
     
   } else{
-    old_citations <- get_recent_citations(con, prev_months=prev_months)
+    old_citations <- get_recent_citations(con, prev_months = prev_months)
     citations <- rbind(new_citations, old_citations)
   }
   
