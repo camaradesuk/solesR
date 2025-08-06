@@ -68,7 +68,10 @@ get_studies_to_screen <- function(con, classify_NA = FALSE, project_name, classi
 #'
 #' @examples
 #' \dontrun{
-#'   screening_decisions <- get_screening_decisions(con = your_database_connection, review_id = "your_project_plus_date")
+#' screening_decisions <- get_screening_decisions(
+#'   con = your_database_connection, 
+#'   review_id = "your_project_plus_date"
+#' )
 #' }
 #' @import dplyr
 #' @export
@@ -693,7 +696,11 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
 #
 #' @examples
 #' \dontrun{
-#' ml_multi_validation(con = db_con, review_id = "my_soles_screening", project_name = "my_soles_project")
+#' ml_multi_validation(
+#'   con = db_con, 
+#'   review_id = "my_soles_screening", 
+#'   project_name = "my_soles_project"
+#' )
 #' }
 #' @return Writes output to .csv files
 #' @export

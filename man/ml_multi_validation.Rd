@@ -22,6 +22,10 @@ and processing it for model training, calibration, and validation.
 }
 \examples{
 \dontrun{
-ml_multi_validation(con = db_con, review_id = "my_soles_screening", project_name = "my_soles_project")
+ml_multi_validation(
+  con = db_con, 
+  review_id = "my_soles_screening", 
+  project_name = "my_soles_project"
+)
 }
 }
