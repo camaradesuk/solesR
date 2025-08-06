@@ -23,7 +23,7 @@ get_crossref_retractions <- function(con, retraction_db = NULL){
     stop("'con' is not a valid database connection")
   }
   
-  # If db input given, dheck valid
+  # If db input given, check valid
   if(!is.null(retraction_db)){
     # Check db input is dataframe
     if(!is.data.frame(retraction_db)){
