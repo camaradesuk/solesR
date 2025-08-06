@@ -19,7 +19,7 @@
 get_crossref_retractions <- function(con, retraction_db = NULL){
   
   # Check con contains connection info
-  if(class(con) != "PqConnection"){
+  if(!inherits(con, "PqConnection")){
     stop("'con' is not a valid database connection")
   }
   

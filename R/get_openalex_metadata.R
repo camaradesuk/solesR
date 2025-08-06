@@ -24,7 +24,7 @@
 get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
   # Check con contains connection info
-  if(class(con) != "PqConnection"){
+  if(!inherits(con, "PqConnection")){
     stop("'con' is not a valid database connection")
   }
   
