@@ -543,6 +543,7 @@ sunburstSever <- function(id, data) {
 #' @param label1 The label above the first input.
 #' @param label2 The label above the second input.
 #' @param title The title of the tab.
+#' @param selected What should be selected.
 #' @param theme The color status of the tab.
 #' @param spinner_colour The color of the spinner used for loading the plot.
 #'
