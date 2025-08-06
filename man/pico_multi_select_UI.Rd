@@ -35,7 +35,7 @@ pico_multi_select_UI(
 
 \item{title}{The title of the tab.}
 
-\item{selected}{What shoult be selected.}
+\item{selected}{What should be selected.}
 
 \item{theme}{The color status of the tab.}
 
