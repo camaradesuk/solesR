@@ -20,6 +20,11 @@
 
 get_ror_coords <- function(con){
   
+  # Check con contains connection info
+  if(class(con) != "PqConnection"){
+    stop("'con' is not a valid database connection")
+  }
+  
   # if table doesn't exist, create it ----
   if (!DBI::dbExistsTable(con, "ror_coords")) {
     
