@@ -5,11 +5,21 @@
 #' the database (in a different format/ from a different source) before they are added to soles. 
 #'
 #' @param con connection to db
-#' @param prev_months number of months to look back in database - default is 2
+#' @param prev_months number of months to look back in database
 #' @return recent citations 
 #' @import DBI
 #' 
 get_recent_citations <- function(con, prev_months = prev_months){
+  
+  # Check con contains connection info
+  if(!inherits(con, "PqConnection")){
+    stop("'con' is not a valid database connection")
+  }
+  
+  # Check prev_months input is numeric
+  if(!is.numeric(prev_months)){
+    stop("'prev_months' should be numeric")
+  }
   
   # Get oldest date using previous months
   older_month <- Sys.Date()-(30*prev_months)
