@@ -550,7 +550,7 @@ format_tiab <- function(df) {
       # removes leading/trailing whitespace 
       mutate(across(c(title, abstract), ~trimws(., "both"))) %>%
       # removes leading dashes and other characters, including when preceded or followed by a space
-      mutate(across(c(title, abstract), ~trimws(., "left", whitespace = "\\s?(\\.|\\:|\\-|\\—|\\–|\\-)\\s?"))) %>%
+      mutate(across(c(title, abstract), ~trimws(., "left", whitespace = "\\s?(\\.|\\:|\\-|\u2013|\u2014|\\-)\\s?"))) %>%
       # replaces multiple spaces with a single space and replaces the phrase 'textbackslash' if present with a space
       mutate(across(c(title, abstract), ~stringr::str_replace_all(., "\\s+|[Tt]extbackslash", " "))) %>% 
       # removes occurrences of \\n
