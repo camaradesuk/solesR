@@ -12,7 +12,8 @@ run_k_fold(
   file_id = "",
   fold_number = 5,
   repeats = 3,
-  validation_prop = 0.2
+  training_prop = 0.8,
+  classifier_name = NULL
 )
 }
 \arguments{
@@ -30,7 +31,9 @@ run_k_fold(
 
 \item{repeats}{An integer specifying how many repeats of the k-fold validation}
 
-\item{validation_prop}{A decimal between 0 and 1. The proportion of all of the screening decisions to be used for final validation. Set to 0 to use all studies for k-fold with no validation. Default is 0.2.}
+\item{training_prop}{A decimal between 0 and 1. The proportion of all of the screening decisions to be used for training. Set to 1 to use all studies for k-fold with no validation. Default is 0.8.}
+
+\item{classifier_name}{A string specifying the classifier name to be used, taken from the study_classification table (e.g. "in-vivo", "in-vitro", "clinical")}
 }
 \value{
 The function does not return an R object. It writes the results to the \code{k-fold-validation} directory.
@@ -64,7 +67,8 @@ run_k_fold(
   sample = FALSE,
   file_id = "_1",
   fold_number = 5,
-  repeats = 3
+  repeats = 3,
+  classifier_name = "animal"
 )
 }
 }
