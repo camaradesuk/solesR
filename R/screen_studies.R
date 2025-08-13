@@ -240,7 +240,7 @@ run_ml <- function(con, training_set, unscreened_set, project_name, classifier_n
 #' 
 #' Results are saved in a directory named `k-fold-validation` in the current working directory.
 #'
-#' @import dplyr tidyr readr janitor
+#' @import dplyr tidyr readr janitor rsample
 #' @examples
 #' \dontrun{
 #' # Example usage:
@@ -287,7 +287,6 @@ run_k_fold <- function(con,
   message("Retrieving human screening decisions from the database...")
   screening_decisions <- get_screening_decisions(con, project_name, classifier_name = classifier_name)
   
-  
   # Set seed and shuffle
   set.seed(123)
   screening_decisions <- screening_decisions[sample(nrow(screening_decisions)), ]
@@ -309,8 +308,8 @@ run_k_fold <- function(con,
     # K-fold is then performed on the training data and a set held out for final validation. Default is 0.8
     split <- rsample::initial_split(screening_decisions, prop = training_prop, strata = "LABEL")
     
-    training_set <- training(split)
-    validation_set  <- testing(split)
+    training_set <- rsample::training(split)
+    validation_set  <- rsample::testing(split)
     
   }
   
@@ -351,23 +350,29 @@ run_k_fold <- function(con,
   
   # Bind all folds and repeats into 1 dataframe
   set <- do.call(rbind, all_folds) %>%
-    mutate(date = date) %>% 
+    mutate(date = date) %>%
     mutate(TEMP_ID = row_number())
   
-  training_set <- set %>% 
-    filter(n_repeat == 1) %>% 
+  training_set <- set %>%
+    filter(n_repeat == 1) %>%
     select(-fold, -n_repeat, -date)
   
-  # Get the max TEMP_ID from the full set
-  max_temp_id <- max(set$TEMP_ID, na.rm = TRUE)
   
-  # Add TEMP_ID to validation_set starting from max_temp_id + 1
-  validation_set <- validation_set %>%
-    mutate(TEMP_ID = seq(from = max_temp_id + 1, length.out = n()))
+  # Save validation set data, if there is a validation set
+  if (training_prop != 1){
+    
+    # Get the max TEMP_ID from the full set
+    max_temp_id <- max(set$TEMP_ID, na.rm = TRUE)
+    
+    # Add TEMP_ID to validation_set starting from max_temp_id + 1
+    validation_set <- validation_set %>%
+      mutate(TEMP_ID = seq(from = max_temp_id + 1, length.out = n()))
+    
+    write.csv(validation_set, paste0(data_output, "kfold_validation_set_", date, file_id, ".csv"), row.names = F)
+  }
   
   # Write the sets to csv
   write.csv(training_set, paste0(data_output, "kfold_training_set_", date, file_id, ".csv"), row.names = F)
-  write.csv(validation_set, paste0(data_output, "kfold_validation_set_", date, file_id, ".csv"), row.names = F)
   write.csv(set, paste0(data_output, "kfold_full_splits_", date, file_id, ".csv"), row.names = F)
   
   # Iterate through each fold and each repeat, changing the calibration fold each time
@@ -431,6 +436,9 @@ run_k_fold <- function(con,
           } else {
             message(sprintf("Max attempts reached for repeat %d, fold %d. Skipping...", r, j))
           }
+        } else{
+          
+          file.remove(paste0(data_output, "kfold_repeat_", r, "_fold_", j,"_", date, file_id, ".tsv"))
         }
       }
     }
@@ -438,13 +446,18 @@ run_k_fold <- function(con,
   
   # Gather all of the results
   ml_scores_list <- list()
+  file_paths <- c()  # Store file paths her
   counter <- 1
+  
   for (r in 1:repeats) {
     for (j in 1:fold_number) {
       
       file_path <- paste0(data_output, "kfold_repeat_", r, "_fold_", j, "_results_", date, file_id, ".tsv")
       
       ml_scores_list[[counter]] <- read_tsv(file_path)
+      
+      # save the file paths for removing after
+      file_paths <- c(file_paths, file_path)
       
       counter <- counter + 1
     }
@@ -459,6 +472,11 @@ run_k_fold <- function(con,
   ml_results <- ml_scores %>%
     left_join(set , by = "TEMP_ID") %>%
     select(uid = ITEM_ID, decision = LABEL, score = probabilities, TEMP_ID, n_repeat, fold)
+  
+  write.csv(ml_results, paste0(data_output, "ml_scores_all_", date, file_id, ".csv"), row.names = F)
+  
+  try(file.remove(file_paths[file.exists(file_paths)]))
+  
   
   # Function to calculate performance at the threshold that gives ≥ 0.95 recall
   evaluate_fold <- function(df) {
@@ -511,14 +529,14 @@ run_k_fold <- function(con,
       mean_threshold = mean(threshold, na.rm = TRUE),
       median_threshold = median(threshold, na.rm = TRUE),
       global_threshold = evaluate_fold(ml_results) %>% pull(threshold),
-      mean_recall = round(mean(recall, na.rm = TRUE),2),
-      sd_recall = round(sd(recall, na.rm = TRUE),2),
-      mean_specificity = round(mean(specificity, na.rm = TRUE),2),
-      sd_specificity = round(sd(specificity, na.rm = TRUE),2),
-      mean_f1 = round(mean(f1, na.rm = TRUE),2),
-      sd_f1 = round(sd(f1, na.rm = TRUE),2),
-      mean_f2 = round(mean(f2, na.rm = TRUE),2),
-      sd_f2 = round(sd(f2, na.rm = TRUE),2)
+      mean_recall = round(mean(recall, na.rm = TRUE),3),
+      sd_recall = round(sd(recall, na.rm = TRUE),3),
+      mean_specificity = round(mean(specificity, na.rm = TRUE),3),
+      sd_specificity = round(sd(specificity, na.rm = TRUE),3),
+      mean_f1 = round(mean(f1, na.rm = TRUE),3),
+      sd_f1 = round(sd(f1, na.rm = TRUE),3),
+      mean_f2 = round(mean(f2, na.rm = TRUE),3),
+      sd_f2 = round(sd(f2, na.rm = TRUE),3)
     )
   
   write.csv(summary_stats, paste0(data_results, "summary_results_", date, file_id, ".csv"), row.names = F)
@@ -675,378 +693,157 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
   return(combined_results)
 }
 
-#' ML Multi-validation function
+#' Run Error Correction
 #'
-#' @description
-#' This function performs a multi-validation for a machine learning algorithm, splitting data into folds
-#' and processing it for model training, calibration, and validation.
+#' This function identifies and selects studies for re-review based on disagreements between human and machine decisions.
+#' This function takes the results from the run_k_fold function on 1 repeat, which will contain a human screening decision and a machine score for each study.
 #'
 #' @param con A database connection object.
-#' @param review_id A string indicating the review ID.
-#' @param project_name A string for the name of the project.
+#' @param k_fold_scores A character string specifying the file path to the CSV containing machine scores.
+#' @param k_fold_performance A character string specifying the file path to the CSV containing performance metrics.
+#' @param type A character string specifying the type of selection method. Options are "extreme discrepancies" or "random".
+#' @param number_to_be_re_reviewed An integer specifying the number of studies to be re-reviewed.
 #'
-#' @import tidyr
-#' @import dplyr 
-#' @import stringr
-#' @import readr
-#' @import caret
-#
+#' @return A dataframe containing the selected studies for re-review.
+#'
 #' @examples
 #' \dontrun{
-#' ml_multi_validation(con = db_con, review_id = "my_soles_screening", project_name = "my_soles_project")
+#' # Run error correction with default parameters
+#' run_error_correction(con = my_connection,
+#'                      k_fold_scores = "k_fold_scores.csv",
+#'                      k_fold_performance = "k_fold_performance.csv",
+#'                      type = "extreme discrepancies",
+#'                      number_to_be_re_reviewed = 100)
 #' }
-#' @return Writes output to .csv files
+#'
 #' @export
-#'
-#'
-ml_multi_validation <- function(con, review_id = "", project_name= ""){
+run_error_correction <- function(con,
+                                 k_fold_scores = as.character(),
+                                 k_fold_thresholds = as.character(),
+                                 type = "extreme discrepancies",
+                                 number_to_be_re_reviewed = as.numeric()){
   
-  # Load source files ============================================================
-  source("/opt/sharedFolder/SSML/create_files_API.R")
-  source("/opt/sharedFolder/SSML/JT_API_config.R")
-  source("/opt/sharedFolder/SSML/JT_API_wrap.R")
-  source("/opt/sharedFolder/SSML/ML_analysis.R")
-  
-  fold_number <- 5
-  sys_date <- format(Sys.Date(), "%d-%m-%Y")
-  
-  message(paste0("Retrieving human screening decisions from the database..."))
-  
-  # Split the data between included and excluded decisions
-  screening_dec_incl <- get_screening_decisions(con, review_id = review_id) %>%
-    filter(LABEL == 1)
-  
-  screening_dec_excl <- get_screening_decisions(con, review_id = review_id) %>%
-    filter(LABEL == 0)
-  
-  # Shuffle the decisions
   set.seed(123)
-  shuffled_incl <- screening_dec_incl[sample(nrow(screening_dec_incl)), ]
-  shuffled_excl <- screening_dec_excl[sample(nrow(screening_dec_excl)), ]
   
-  # Create the splits
-  incl_splits <- shuffled_incl %>% 
-    group_by((row_number()-1) %/% (n()/fold_number)) %>%
-    nest %>% pull(data)
+  thresholds <- read.csv(k_fold_thresholds)
   
-  excl_splits <- shuffled_excl %>% 
-    group_by((row_number()-1) %/% (n()/fold_number)) %>%
-    nest %>% pull(data)
+  k_fold_scores <-  read.csv(k_fold_scores) %>%
+    left_join(thresholds, by = "fold") %>%
+    janitor::clean_names() %>%
+    select(uid, label = decision, fold, threshold, score)
   
-  fold_list <- list()
+  disagreements <- k_fold_scores %>%
+    mutate(disagreement = case_when(
+      (label == 1 & score < threshold) ~ TRUE,
+      (label == 0 & score >= threshold) ~ TRUE,
+      TRUE ~ FALSE
+    )) %>%
+    filter(disagreement == TRUE) %>% 
+    mutate(uid = sub("^wos:", "wos-", uid))
   
-  message(paste0("Creating ", fold_number, " folds..."))
   
-  # Loop through each fold
-  for (i in 1:fold_number) {
+  # Calculate the number of folds
+  number_folds <- length(unique(k_fold_scores$fold))
+  
+  message(paste0("Total number of disagreements found: ", nrow(disagreements)))
+
+  
+  unique_citations <- tbl(con, "unique_citations") %>%
+    filter(uid %in% disagreements$uid) %>% 
+    select(uid, title, abstract, author, year, doi, journal) %>%
+    collect()
+  
+  # Keep only the disagreements with abstracts for studies to be re-screened
+  disagreements_abstracts_only <- disagreements %>%
+    select(uid, score, label) %>%
+    left_join(unique_citations, by = c("uid")) 
+  
+  message(paste0("Total number of disagreements found: ", nrow(disagreements_abstracts_only)))
+  
+  if (type == "extreme discrepancies"){
     
-    # Combine the included and excluded splits for each fold
-    fold <- rbind(incl_splits[[i]], excl_splits[[i]])
+    message(paste0("Finding ", number_to_be_re_reviewed, " studies with the most extreme discrepancies between Human and Machine descisions..."))
     
-    # Add a new column indicating the fold number
-    fold$fold <- i
+    # Calculate number of disagreements which were included/excluded by the human reviewer
+    # Take the most "extreme" disagreements from each side, at the specified amount
+    disagreements_human_included <- disagreements_abstracts_only %>%
+      filter(label == 1) %>%
+      arrange(score) %>%
+      head(number_to_be_re_reviewed/2)
     
-    # Append the fold to the fold_list
-    fold_list[[i]] <- fold
-  }
-  
-  set <- do.call(rbind, fold_list)
-  
-  # Function to create the different fold sequences
-  generate_sequence <- function() {
-    base_seq <- 1:5
-    result <- list()
+    disagreements_human_excluded <- disagreements_abstracts_only %>%
+      filter(label == 0) %>%
+      arrange(desc(score)) %>%
+      head(number_to_be_re_reviewed/2)
     
-    for (i in 1:5) {
-      # Shift the first element to the front
-      first_num <- base_seq[i]
-      remaining <- base_seq[-i]
+    # If the requested number for re-screening is greater than the number of disagreements included by human, ask user to take disagreements from human excluded side
+    if (nrow(disagreements_human_included) < (number_to_be_re_reviewed/2)){
       
-      # Now rotate the remaining elements 4 times
-      for (j in 0:3) {
-        rotated <- c(first_num, remaining[(1+j):(4+j) %% 4 + 1])
-        result[[length(result) + 1]] <- rotated
+      answer <- menu(
+        c("Yes", "No"),
+        title = paste0(
+          "Number of disagreements between human and machine (which the human \"Included\"), is less than ", 
+          (number_to_be_re_reviewed/2), 
+          ".\n",
+          "Would you like to take the remaining amount from the disagreements which the human \"Excluded\"?"
+        )
+      )
+      
+      
+      if (answer == 1){
+        
+        disagreements_human_excluded <- disagreements_abstracts_only %>%
+          filter(label == 0) %>%
+          arrange(desc(score)) %>%
+          head(number_to_be_re_reviewed - nrow(disagreements_human_included))
+      }
+      
+      # If the requested number for re-screening is greater than the number of disagreements "Excluded" by human, ask user to take disagreements from human "Included" side
+    }else if ((nrow(disagreements_human_excluded) < (number_to_be_re_reviewed/2))){
+      
+      answer <- menu(
+        c("Yes", "No"),
+        title = paste0(
+          "Number of disagreements between human and machine (which the human \"Excluded\"), is less than ", 
+          (number_to_be_re_reviewed/2), 
+          ".\n",
+          "Would you like to take the remaining amount from the disagreements which the human \"Included\"?"
+        )
+      )
+      
+      
+      if (answer == 1){
+        
+        disagreements_human_included <- disagreements_abstracts_only %>%
+          filter(label == 1) %>%
+          arrange(desc(score)) %>%
+          head(number_to_be_re_reviewed - nrow(disagreements_human_excluded))
+        
       }
     }
     
-    # Convert result to a dataframe
-    sequence_df <- as.data.frame(do.call(rbind, result))
+    # Combine "extreme discrepancies" which the human included and excluded
+    total_to_re_screen <- disagreements_human_excluded %>%
+      rbind(disagreements_human_included)
     
-    # Add 'iteration' column
-    sequence_df$iteration <- 1:nrow(sequence_df)
     
-    # Add 'Cat' column for each position
-    colnames(sequence_df) <- c("Validate", "Calibrate", "Train1", "Train2", "Train3", "iteration")
+    # If the user wants to re-review a certain number of random studies where the machine disagreed with the human reviewer
+  } else if (type == "random"){
     
-    return(sequence_df)
+    message(paste0("Finding ", number_to_be_re_reviewed, " studies at random with disagreements between the human and machine..."))
+    
+    total_to_re_screen <- disagreements_abstracts_only[sample(nrow(disagreements_abstracts_only), number_to_be_re_reviewed), ]
+    
   }
   
-  sequence <- generate_sequence()
+  # Shuffle the dataframe before returning for re-review
+  total_to_re_screen <- total_to_re_screen[sample(nrow(total_to_re_screen)), ]
   
-  # Create an empty list to store each iteration's dataframe
-  all_iterations <- list()
+  # Use get_syrf_sample to return csv in correct format for SyRF
+  total_to_re_screen <- get_syrf_sample(total_to_re_screen, sample_size = nrow(total_to_re_screen), abstracts_only = FALSE)
   
-  # Loop over each iteration in the sequence
-  for (iter in 1:nrow(sequence)) {
-    
-    # Extract the current fold assignment for this iteration
-    fold_assignment <- sequence[iter, 1:5]
-    
-    # Create a copy of the original data for this iteration
-    iteration_df <- set
-    
-    iteration_df <- iteration_df %>%
-      mutate(Cat = case_when(
-        fold == fold_assignment$Validate ~ "Validate",
-        fold == fold_assignment$Calibrate ~ "Calibrate",
-        fold == fold_assignment$Train1 ~ "Train1",
-        fold == fold_assignment$Train2 ~ "Train2",
-        fold == fold_assignment$Train3 ~ "Train3"
-      ))
-    
-    # Add the iteration column
-    iteration_df$iteration <- iter
-    
-    # Append to the list
-    all_iterations[[iter]] <- iteration_df
-  }
+  message(paste0(nrow(total_to_re_screen), " studies for re-review written to syrf_sample_date.csv and returned in dataframe"))
   
-  # Combine all iterations into a single dataframe
-  labelled_data_assigned <- do.call(rbind, all_iterations)
+  return(total_to_re_screen)
   
-  labelled_data_assigned_summary <- labelled_data_assigned %>%
-    select(iteration, LABEL) %>%
-    group_by(iteration, LABEL) %>%
-    count() %>%
-    pivot_wider(id_cols = iteration, 
-                names_from = LABEL, 
-                names_glue = "LABEL_{LABEL}_n",
-                values_from = n) %>%
-    mutate(total_n = LABEL_0_n + LABEL_1_n)
-  
-  # Create file paths for output
-  path <- "screening/validation/output"
-  
-  if (!dir.exists(path)) {
-    dir.create(path, recursive = TRUE)
-    message(paste("Directory created:", path))
-  } else {
-    message(paste("Directory already exists:", path))
-  }
-  
-  write.csv(labelled_data_assigned, paste0("screening/validation/labelled_data_assigned_", sys_date, ".csv"), row.names = F)
-  write.csv(labelled_data_assigned_summary, paste0("screening/validation/labelled_data_assigned_summary_", sys_date, ".csv"), row.names = F)
-  
-  labelled_data_assigned_iteration <- labelled_data_assigned
-  
-  labelled_data_assigned_iteration$TEMP_ID <- 1:nrow(labelled_data_assigned_iteration)
-  
-  write.csv(labelled_data_assigned_iteration,
-            paste0("screening/validation/labelled_data_assigned_iteration_", sys_date, ".csv"),
-            row.names = F)
-  
-  # Prepare each fold to go through ML ===========================================
-  
-  # When passing data into the ML, only the training set should be labelled with
-  # 1 or 0. The Calibration and validation set should be given 99 labels (e.g. 
-  # unknown).
-  
-  #Format data to be run through ML
-  labelled_data_assigned_iteration_processed <- labelled_data_assigned_iteration %>%
-    mutate(LABEL = ifelse(Cat %in% c("Calibrate", "Validate"), 99, LABEL),
-           REVIEW_ID = review_id) %>%
-    select(REVIEW_ID, ITEM_ID, TITLE, ABSTRACT, LABEL, TEMP_ID, iteration) %>%
-    mutate(TITLE = str_squish(TITLE),
-           ABSTRACT = str_squish(ABSTRACT))
-  
-  
-  # Set up for ML and run ML =====================================================
-  n_iterations <- max(labelled_data_assigned_iteration_processed$iteration)
-  
-  # Loop through iterations
-  for (i in 1:n_iterations) {
-    # Initialize attempt counter
-    attempt <- 1
-    success <- FALSE
-    
-    # Retry loop
-    while (attempt <= 3 && !success) {
-      tryCatch(
-        {
-          # Write data for each iteration
-          write_tsv(
-            filter(labelled_data_assigned_iteration_processed, iteration == i) %>%
-              select(-iteration),
-            paste0("screening/validation/labelled_data_iteration_", i, "_", sys_date, ".tsv")
-          )
-          
-          # Create iteration filenames
-          iteration_filenames <- CreateFileNamesForIOEAPI(
-            paste0("screening/validation/labelled_data_iteration_", i, "_", sys_date, ".tsv"),
-            paste0("screening/validation/output/labelled_data_iteration_", i, "_results_", sys_date, ".tsv")
-          )
-          
-          # Send data to ML via API and return results to output folder
-          TrainCollection(iteration_filenames, projectId = paste0(project_name, "_validation_iteration_", i, "_", sys_date))
-          
-          # If successful, mark success and exit retry loop
-          success <- TRUE
-        },
-        error = function(e) {
-          message(paste0("Error in iteration ", i, ", attempt ", attempt, ": ", e$message))
-          attempt <- attempt + 1
-          if (attempt > 3) {
-            message(paste0("Failed to process iteration ", i, " after 3 attempts."))
-          }
-        }
-      )
-    }
-  }
-  
-  # Process scores from ML =======================================================
-  
-  # Initialize an empty list to store each iteration's data frame
-  ml_scores_list <- list()
-  
-  for (i in 1:n_iterations) {
-    
-    file_path <- paste0("screening/validation/output/labelled_data_iteration_", i, "_results_", sys_date, ".tsv")
-    
-    # Read the file, add the iteration column, and store it in the list
-    ml_scores_list[[i]] <- read_tsv(file_path) %>%
-      mutate(iteration = i)
-  }
-  
-  # Combine all data frames in the list into a single data frame
-  ml_scores <- bind_rows(ml_scores_list) %>%
-    select(-Incl, TEMP_ID = PaperId)
-  
-  # match with input data
-  ml_results <- merge(labelled_data_assigned_iteration, ml_scores, 
-                      by = c("TEMP_ID", "iteration"), all = T) %>%
-    select(iteration, uid = ITEM_ID, decision = LABEL, fold, Cat, score = probabilities)
-  
-  # Calculate performance at each threshold ======================================
-  
-  # Create a dataframe with just calibration data for analysis
-  ml_results_calibrate <- ml_results %>%
-    filter(Cat == "Calibrate") %>%
-    mutate(decision = factor(decision))
-  
-  # Assign 1 or 0 to each score at each threshold from 0.01 to 1 (0.01 increments)
-  for(i in seq(0.01,1,by=0.01)){
-    col <- paste("Threshold", i, sep= "_")
-    ml_results_calibrate[[col]] <- as.factor(ifelse(ml_results_calibrate$score >= i, 1, 0))
-  }
-  
-  # Create vectors containing names of all columns relevant to regex tiab screening
-  cols <- colnames(select(ml_results_calibrate,contains("Threshold_")))
-  
-  # Create empty dataframe for results
-  results <- data.frame(matrix(nrow = 0, ncol = 8))
-  
-  # Loop over iterations
-  for (i in 1:n_iterations){
-    # Get the calibration set data for the iteration
-    iteration_calibration <- filter(ml_results_calibrate, iteration == i)
-    # Calculate the results for the iteration across all thresholds
-    result <- data.frame(iteration = i,
-                         threshold = seq(0.01,1, by = 0.01),
-                         recall = lapply(iteration_calibration[cols],
-                                         sensitivity,
-                                         reference = iteration_calibration$decision,
-                                         positive = 1) %>%
-                           unlist() %>%
-                           unname(),
-                         specificity = lapply(iteration_calibration[cols],
-                                              specificity,
-                                              reference = iteration_calibration$decision,
-                                              negative = 0) %>%
-                           unlist() %>%
-                           unname(),
-                         tp = lapply(iteration_calibration[cols],
-                                     function(x){x$tpos <- nrow(iteration_calibration %>%
-                                                                  filter(x == 1 & decision == 1))}) %>%
-                           unlist() %>%
-                           unname(),
-                         tn = lapply(iteration_calibration[cols],
-                                     function(x){x$tneg <- nrow(iteration_calibration %>%
-                                                                  filter(x == 0 & decision == 0))}) %>%
-                           unlist() %>%
-                           unname(),
-                         fp = lapply(iteration_calibration[cols],
-                                     function(x){x$fpos <- nrow(iteration_calibration %>%
-                                                                  filter(x == 1 & decision == 0))}) %>%
-                           unlist() %>%
-                           unname(),
-                         fn = lapply(iteration_calibration[cols],
-                                     function(x){x$fneg <- nrow(iteration_calibration %>%
-                                                                  filter(x == 0 & decision == 1))}) %>%
-                           unlist() %>%
-                           unname()) %>%
-      mutate(precision = tp / (tp + fp),
-             f1 = (2 * precision * recall)/(precision + recall))
-    
-    # Combine with full dataset
-    results <- rbind(results, result)
-  }
-  
-  # Initialize an empty list to store each iteration's results
-  results_best_list <- list()
-  
-  # Loop through each iteration
-  for (i in 1:n_iterations) {
-    # Filter for the current iteration, get rows with recall >= 0.95, and keep the last row
-    results_best_list[[i]] <- results %>%
-      filter(iteration == i, recall >= 0.95) %>%
-      tail(1)
-  }
-  
-  # Combine all results into a single data frame
-  results_best <- bind_rows(results_best_list)
-  
-  # Get ml scores for validation =================================================
-  # Create empty dataframe for results
-  ml_results_validate <- data.frame(matrix(nrow = 0, ncol = 4))
-  
-  for (i in 1:n_iterations){
-    val <- ml_results %>%
-      filter(Cat == "Validate") %>%
-      filter(iteration == i) %>%
-      mutate(ml_decision = ifelse(score >= results_best$threshold[results_best$iteration == i], 1, 0)) %>%
-      mutate(decision = factor(decision)) %>%
-      mutate(ml_decision = factor(ml_decision))
-    
-    ml_results_validate <- rbind(ml_results_validate, val)
-  }
-  
-  # Create empty dataframe for validation results
-  results_val <- data.frame(matrix(nrow = 0, ncol = 7))
-  
-  # Loop over iterations
-  for (i in 1:n_iterations){
-    # Get validation set data for iteration
-    iteration_validate <- ml_results_validate %>% filter(iteration == i)
-    # Calculate results for validation in each iteration
-    result_val <- data.frame(iteration = i,
-                             recall = sensitivity(iteration_validate$ml_decision,
-                                                  reference = iteration_validate$decision,
-                                                  positive = 1),
-                             specificity = specificity(iteration_validate$ml_decision,
-                                                       reference = iteration_validate$decision,
-                                                       negative = 0),
-                             tp = nrow(filter(iteration_validate, decision == 1 & ml_decision == 1)),
-                             tn = nrow(filter(iteration_validate, decision == 0 & ml_decision == 0)),
-                             fp = nrow(filter(iteration_validate, decision == 0 & ml_decision == 1)),
-                             fn = nrow(filter(iteration_validate, decision == 1 & ml_decision == 0))) %>%
-      mutate(precision = tp / (tp + fp),
-             f1 = (2 * precision * recall)/(precision + recall))
-    
-    results_val <- rbind(results_val, result_val)
-  }
-  
-  write.csv(ml_scores, paste0("screening/validation/output/ml_scores_", sys_date, ".csv"),  row.names = F)
-  write.csv(results, paste0("screening/validation/output/result_calibrate_", sys_date, ".csv"), row.names = F)
-  write.csv(results_best, paste0("screening/validation/output/result_calibrate_best_", sys_date, ".csv"), row.names = F)
-  write.csv(results_val, paste0("screening/validation/output/result_validate_", sys_date, ".csv"), row.names = F)
 }
