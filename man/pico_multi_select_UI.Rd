@@ -35,6 +35,8 @@ pico_multi_select_UI(
 
 \item{title}{The title of the tab.}
 
+\item{selected}{What should be selected.}
+
 \item{theme}{The color status of the tab.}
 
 \item{spinner_colour}{The color of the spinner used for loading the plot.}

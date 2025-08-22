@@ -35,6 +35,11 @@ the chosen method.
 \examples{
 \dontrun{
 Tag studies using full text regex
-complete_pico_tag(con, tag_method = "fulltext", tag_type = "intervention", tag_main_category = "all")
+complete_pico_tag(
+  con, 
+  tag_method = "fulltext", 
+  tag_type = "intervention", 
+  tag_main_category = "all"
+)
 }
 }

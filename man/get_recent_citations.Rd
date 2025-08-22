@@ -9,7 +9,7 @@ get_recent_citations(con, prev_months = prev_months)
 \arguments{
 \item{con}{connection to db}
 
-\item{prev_months}{number of months to look back in database - default is 2}
+\item{prev_months}{number of months to look back in database}
 }
 \value{
 recent citations

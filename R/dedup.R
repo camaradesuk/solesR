@@ -5,10 +5,21 @@
 #' the database (in a different format/ from a different source) before they are added to soles. 
 #'
 #' @param con connection to db
-#' @param prev_months number of months to look back in database - default is 2
+#' @param prev_months number of months to look back in database
 #' @return recent citations 
+#' @import DBI
 #' 
 get_recent_citations <- function(con, prev_months = prev_months){
+  
+  # Check con contains connection info
+  if(!inherits(con, "PqConnection")){
+    stop("'con' is not a valid database connection")
+  }
+  
+  # Check prev_months input is numeric
+  if(!is.numeric(prev_months)){
+    stop("'prev_months' should be numeric")
+  }
   
   # Get oldest date using previous months
   older_month <- Sys.Date()-(30*prev_months)
@@ -25,7 +36,7 @@ get_recent_citations <- function(con, prev_months = prev_months){
   # Write database query to retrieve records matching dates
   query <- paste0('SELECT * FROM unique_citations WHERE date ~ \'(', regex_pattern, ')\'')
   # Query database
-  recent_citations_in_db <- dbGetQuery(con, query)
+  recent_citations_in_db <- DBI::dbGetQuery(con, query)
   
   # edit source for dedup - in database already
   recent_citations_in_db$source <- "in_db_already"
@@ -45,13 +56,28 @@ get_recent_citations <- function(con, prev_months = prev_months){
 #' @return recent citations 
 #' @export
 #' 
-get_new_unique <- function(con, new_citations, prev_months=2){
+get_new_unique <- function(con, new_citations, prev_months = 2){
+  
+  # Check con contains connection info
+  if(!inherits(con, "PqConnection")){
+    stop("'con' is not a valid database connection")
+  }
+  
+  # Check input is dataframe
+  if(!is.data.frame(new_citations)){
+    stop("Input is not a data frame")
+  }
+  
+  # Check prev_months input is numeric
+  if(!is.numeric(prev_months)){
+    stop("'prev_months' should be numeric")
+  }
   
   if(prev_months == 0){
     citations <- new_citations
     
   } else{
-    old_citations <- get_recent_citations(con, prev_months=prev_months)
+    old_citations <- get_recent_citations(con, prev_months = prev_months)
     citations <- rbind(new_citations, old_citations)
   }
   

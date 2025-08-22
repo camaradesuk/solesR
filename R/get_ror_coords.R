@@ -21,7 +21,7 @@
 get_ror_coords <- function(con){
   
   # Check con contains connection info
-  if(class(con) != "PqConnection"){
+  if(!inherits(con, "PqConnection")){
     stop("'con' is not a valid database connection")
   }
   

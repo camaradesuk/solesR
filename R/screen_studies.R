@@ -68,7 +68,10 @@ get_studies_to_screen <- function(con, classify_NA = FALSE, project_name, classi
 #'
 #' @examples
 #' \dontrun{
-#'   screening_decisions <- get_screening_decisions(con = your_database_connection, review_id = "your_project_plus_date")
+#' screening_decisions <- get_screening_decisions(
+#'   con = your_database_connection, 
+#'   review_id = "your_project_plus_date"
+#' )
 #' }
 #' @import dplyr
 #' @export
