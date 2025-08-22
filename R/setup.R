@@ -129,6 +129,12 @@ read_search <- function(file) {
   # read search file
   dat <- soles::manual_upload(file, source = source)
   
+  try(dat <- soles::manual_upload(file, source = source), silent = TRUE)
+  
+  # add column with date in folder name
+  search_date <- stringr::str_extract(filename,  "(0[1-9]|[12][0-9]|3)(0[1-9]|1[0-2])\\d{2}(?!\\d)")
+  
+  dat <- dat %>% mutate(search_date = search_date)
 }
 
 
@@ -142,11 +148,11 @@ read_search <- function(file) {
 #' @param master_node OSF master node
 #' @details The function expects that within the main search folder, each sub-folder is named after the corresponding database source. 
 #' Valid sub-folder names are: pubmed, medline, wos, scopus, ovid, psychinfo, embase.
-#' The function also expects that each search file within the sub-folder follows the consistent naming convention `source_date`, where `source` 
+#' The function also allows users to include a date, following the naming convention `source_date`, where `source` 
 #' is the literature database and `date` corresponds to the date the search was conducted in `ddmmyyyy` format.
-#' For example, the following would be valid search export file names: `pubmed_01012023.txt`, `scopus_15102022.bib`. 
-#' If multiple export files from the same search on the same date exist, these can be distinguished by numbering the searches 
-#' e.g. `pubmed1_01012023.txt`, `pubmed2_01012023.txt`, etc. Full path example: `manual_search/pubmed/pubmed1_01012023.txt`
+#' If a date is included in the folder name, this will populate the `date` field of unique citations.
+#' 
+#' For example, the following would be valid folder names: `pubmed_010123`, `scopus_151022`. 
 #'
 #'
 #' @examples
@@ -174,10 +180,19 @@ setup_soles <- function(con, folder, master_node){
     lapply(files, read_search)
   )
   
+  search_results <- search_results %>% 
+    mutate(date = case_when(
+      !is.na(search_date) ~ search_date,
+      is.na(search_date) ~ date
+    )) %>% 
+    select(-search_date)
+  
+  
   # show table with search file info
   file_summary <- search_results %>% 
-    group_by(filename) %>% 
-    summarize(n=length(unique(uid)))
+    filter(source %in% c("pubmed","wos","scopus","psychinfo","medline","ovid","embase")) %>% 
+    group_by(source) %>% 
+    summarise(n=length(unique(uid)))
   
   message('The following records were found in each file.')
   print(file_summary)

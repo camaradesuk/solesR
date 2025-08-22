@@ -21,11 +21,11 @@ This function reads in search files in the soles project directory and populates
 \details{
 The function expects that within the main search folder, each sub-folder is named after the corresponding database source.
 Valid sub-folder names are: pubmed, medline, wos, scopus, ovid, psychinfo, embase.
-The function also expects that each search file within the sub-folder follows the consistent naming convention \code{source_date}, where \code{source}
+The function also allows users to include a date, following the naming convention \code{source_date}, where \code{source}
 is the literature database and \code{date} corresponds to the date the search was conducted in \code{ddmmyyyy} format.
-For example, the following would be valid search export file names: \code{pubmed_01012023.txt}, \code{scopus_15102022.bib}.
-If multiple export files from the same search on the same date exist, these can be distinguished by numbering the searches
-e.g. \code{pubmed1_01012023.txt}, \code{pubmed2_01012023.txt}, etc. Full path example: \code{manual_search/pubmed/pubmed1_01012023.txt}
+If a date is included in the folder name, this will populate the \code{date} field of unique citations.
+
+For example, the following would be valid folder names: \code{pubmed_010123}, \code{scopus_151022}.
 }
 \examples{
 \dontrun{
