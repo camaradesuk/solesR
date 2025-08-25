@@ -354,6 +354,8 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
   res_oa <- res %>% 
     select(doi, is_oa, oa_status) %>% 
+    # Fix logic in is_oa
+    mutate(is_oa = if_else(oa_status == "closed", FALSE, TRUE)) %>%
     mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
     mutate(method = "OpenAlex") %>% 
     filter(!doi %in% open_access_full$doi,
