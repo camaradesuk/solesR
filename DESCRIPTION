@@ -70,7 +70,8 @@ Imports:
     dbplyr,
     httr,
     jsonlite,
-    caret
+    caret,
+    rsample
 VignetteBuilder: knitr
 Remotes: 
     kaitlynhair/RISmed,
