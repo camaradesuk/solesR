@@ -12,7 +12,7 @@
 #' @import tidyr
 #' @import stringr
 #' @import openalexR
-#' @return Tables "discipline_tag", "funder_grant_tag", "institution_tag", "citation_count_tag", "retraction_tag", "article_type", oa_tag" will be updated with n number of new rows containing metadata. If no data is retrieved for these n citations, "Unknown" will be returned in the relevant columns. 
+#' @return Tables "discipline_tag", "funder_grant_tag", "institution_tag", "citation_count_tag", "retraction_tag", "oa_tag" will be updated with n number of new rows containing metadata. If no data is retrieved for these n citations, "Unknown" will be returned in the relevant columns. 
 #' @export
 #' @examples
 #' \dontrun{
@@ -36,7 +36,6 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
       "institution_tag", 
       "citation_count_tag", 
       "retraction_tag", 
-      "article_type", 
       "oa_tag"))) {
       stop("'fill_table' is not valid database table name.")
     }
@@ -108,19 +107,6 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     
   }
   
-  if (!dbExistsTable(con, "article_type")) {
-    
-    article <- data.frame(doi = as.character(),
-                          language = as.character(),
-                          type = as.character(),
-                          is_paratext = as.logical(),
-                          method = as.character())
-    
-    dbWriteTable(con, "article_type", article)
-    message("Created article_type table.")
-    
-  }
-  
   if (!dbExistsTable(con, "oa_tag")) {
     
     open_access <- data.frame(doi = as.character(), 
@@ -152,9 +138,6 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   open_access_full <- tbl(con, "oa_tag") %>% 
     collect()
   
-  article_full <- tbl(con, "article_type") %>%
-    collect()
-  
   # Get data
   included <- dbReadTable(con, "study_classification") %>% filter(decision == "include")
   dois <- tbl(con, "unique_citations") %>% select(uid, doi) %>% collect()
@@ -166,9 +149,8 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
       filter(uid %in% included$uid) %>%
       # Filter to get DOIs that are missing in AT LEAST ONE table
       filter(!doi %in% institution_full$doi | !doi %in% discipline_full$doi |
-               !doi %in% article_full$doi | !doi %in% citation_count_full$doi |
-               !doi %in% funder_full$doi | !doi %in% open_access_full$doi |
-               !doi %in% retraction_full$doi) %>% 
+               !doi %in% citation_count_full$doi | !doi %in% funder_full$doi | 
+               !doi %in% open_access_full$doi | !doi %in% retraction_full$doi) %>% 
       mutate(across(where(is.character), ~na_if(., ""))) %>%
       filter(!(is.na(doi))) %>%
       select(doi) %>%
@@ -385,29 +367,12 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
   res_oa <- rbind(res_oa, res_oa_failed)
   
-  res_article <- res %>% 
-    select(doi, language, type, is_paratext) %>% 
-    mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
-    mutate(method = "OpenAlex") %>% 
-    filter(!doi %in% article_full$doi,
-           doi %in% citations_missing_data$doi) %>%
-    replace(is.na(.), "Unknown")
-  
-  res_article_failed <- citations_missing_data %>%
-    filter(!doi %in% res_article$doi,
-           !doi %in% article_full$doi) %>%
-    mutate(language = "Unknown", type = "Unknown", is_paratext = NA, method = "OpenAlex")
-  
-  res_article <- rbind(res_article, res_article_failed)
-  res_article$method = "OpenAlex"
-  
   
   # Append tables with new data ----
   dbWriteTable(con, "institution_tag", res_institution, append = TRUE)
   dbWriteTable(con, "discipline_tag", res_concepts, append = TRUE)
   dbWriteTable(con, "funder_grant_tag", res_funder, append = TRUE)
   dbWriteTable(con, "oa_tag", res_oa, append = TRUE)
-  dbWriteTable(con, "article_type", res_article, append = TRUE)
   dbWriteTable(con, "citation_count_tag", res_citation_count, append = TRUE)
   dbWriteTable(con, "retraction_tag", res_retraction, append = TRUE)
   
