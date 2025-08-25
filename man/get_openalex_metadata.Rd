@@ -14,7 +14,7 @@ get_openalex_metadata(con, fill_table = NULL, n = 100)
 \item{n}{Number of studies to be tagged}
 }
 \value{
-Tables "discipline_tag", "funder_grant_tag", "institution_tag", "citation_count_tag", "retraction_tag", "article_type", oa_tag" will be updated with n number of new rows containing metadata. If no data is retrieved for these n citations, "Unknown" will be returned in the relevant columns.
+Tables "discipline_tag", "funder_grant_tag", "institution_tag", "citation_count_tag", "retraction_tag", "oa_tag" will be updated with n number of new rows containing metadata. If no data is retrieved for these n citations, "Unknown" will be returned in the relevant columns.
 }
 \description{
 This function retrieves meta-data.
