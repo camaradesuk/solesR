@@ -703,7 +703,7 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
 #'
 #' @param con A database connection object.
 #' @param k_fold_scores A character string specifying the file path to the CSV containing machine scores.
-#' @param k_fold_performance A character string specifying the file path to the CSV containing performance metrics.
+#' @param k_fold_thresholds A character string specifying the file path to the CSV containing performance metrics.
 #' @param type A character string specifying the type of selection method. Options are "extreme discrepancies" or "random".
 #' @param number_to_be_re_reviewed An integer specifying the number of studies to be re-reviewed.
 #'
@@ -714,7 +714,7 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
 #' # Run error correction with default parameters
 #' run_error_correction(con = my_connection,
 #'                      k_fold_scores = "k_fold_scores.csv",
-#'                      k_fold_performance = "k_fold_performance.csv",
+#'                      k_fold_thresholds = "k_fold_performance.csv",
 #'                      type = "extreme discrepancies",
 #'                      number_to_be_re_reviewed = 100)
 #' }
