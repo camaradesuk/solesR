@@ -17,11 +17,11 @@ run_error_correction(
 
 \item{k_fold_scores}{A character string specifying the file path to the CSV containing machine scores.}
 
+\item{k_fold_thresholds}{A character string specifying the file path to the CSV containing performance metrics.}
+
 \item{type}{A character string specifying the type of selection method. Options are "extreme discrepancies" or "random".}
 
 \item{number_to_be_re_reviewed}{An integer specifying the number of studies to be re-reviewed.}
-
-\item{k_fold_performance}{A character string specifying the file path to the CSV containing performance metrics.}
 }
 \value{
 A dataframe containing the selected studies for re-review.
@@ -35,7 +35,7 @@ This function takes the results from the run_k_fold function on 1 repeat, which 
 # Run error correction with default parameters
 run_error_correction(con = my_connection,
                      k_fold_scores = "k_fold_scores.csv",
-                     k_fold_performance = "k_fold_performance.csv",
+                     k_fold_thresholds = "k_fold_performance.csv",
                      type = "extreme discrepancies",
                      number_to_be_re_reviewed = 100)
 }
