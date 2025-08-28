@@ -70,6 +70,9 @@ manual_upload <- function(paths, source) {
   # Make DOI lowercase
   combined_data$doi <- tolower(combined_data$doi)
   
+  # Remove any additional DOIs (e.g., elife versioning)
+  combined_data$doi <- gsub("; .+$", "", combined_data$doi)
+  
   # Return data
   return(combined_data)
 }
