@@ -90,6 +90,9 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
 
   # Make DOI lowercase
   scopus_results$doi <- tolower(scopus_results$doi)
+  
+  # Remove any additional DOIs (e.g., elife versioning)
+  scopus_results$doi <- gsub("; .+$", "", scopus_results$doi)
 
   # Return search results
   return(scopus_results)
@@ -242,6 +245,9 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
 
   # Make DOI lowercase
   wos_results$doi <- tolower(wos_results$doi)
+  
+  # Remove any additional DOIs (e.g., elife versioning)
+  wos_results$doi <- gsub("; .+$", "", wos_results$doi)
 
   # Return search results
   return(wos_results)
@@ -376,6 +382,9 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
 
   # Make DOI lowercase
   pubmed_results$doi <- tolower(pubmed_results$doi)
+  
+  # Remove any additional DOIs (e.g., elife versioning)
+  pubmed_results$doi <- gsub("; .+$", "", pubmed_results$doi)
 
   # Print number of records retrieved
   message("\nRetrieved ", nrow(pubmed_results), " records from PubMed")

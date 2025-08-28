@@ -261,7 +261,9 @@ get_missing_dois <- function(citations){
         mutate(final_match = ifelse(auth_match == "no" & jour_match == "no" & page_match == "no", "not_match", paste(final_match))) %>%
         filter(final_match == "match") %>%
         select(uid, new_doi) %>%
-        rename(doi = new_doi), silent=TRUE)
+        rename(doi = new_doi) %>%
+        # Remove any additional DOIs (e.g, elife versioning)
+        mutate(doi = gsub("; .+$", "", doi)), silent=TRUE)
   
   # Pint message
   if(!exists("correct_doi")){
