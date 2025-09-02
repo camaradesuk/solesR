@@ -46,6 +46,42 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
   if (is.logical(format_soles) == FALSE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
   }
+  
+  # Check for API key and exit if NULL
+  if (is.null(timespan)) {
+    stop(message("Error: you have not entered a timespan for the search"))
+  }
+  
+  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+    stop(message("Error: timespan format incorrect"))
+  }
+  
+  # Define timespan for search
+  if (grepl("(?i)week", timespan) == TRUE) {
+    # Get number of weeks by removing non-digit characters
+    x <- as.numeric(gsub("\\D", "", timespan))
+    # Assign min date as x number of weeks before today's date
+    min_date_char <- Sys.Date() - 7 * x
+    # Assign max date as today
+    max_date_char <- Sys.Date()
+    # Print search dates
+    message("Searching from ", min_date_char, " to ", max_date_char)
+  } else if (grepl("(?i)month", timespan) == TRUE) {
+    # Get number of months by removing non-digit characters
+    x <- as.numeric(gsub("\\D", "", timespan))
+    # Assign min date as x number of months before today's date
+    min_date_char <- Sys.Date() - 31 * x
+    # Assign max date as today
+    max_date_char <- Sys.Date()
+    # Print search dates
+    message("Searching from ", min_date_char, " to ", max_date_char)
+  }
+  
+  # Minus one day from min date (because scopus only searches after this date)
+  min_date_char <- min_date_char - 1
+  
+  # Append timespan to user query to define final query
+  full_query <- paste0("(", query, ") AND LOAD-DATE >", min_date_char)
 
   # Print message
   message("Running Scopus search...")
@@ -55,7 +91,7 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
     {
       # Try getting results
       scopus_results <- scopusAPI::search_scopus(
-        string = query,
+        string = full_query,
         api_key = api_key,
         retMax = retMax
       )
@@ -331,11 +367,11 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   message("Running PubMed search...")
   
   # Add dates to query
-  query_full <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Modification])")
+  full_query <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Modification]")
 
   # Get summary of NCBI EUtils query
   pubmed_search <- RISmed::EUtilsSummary(
-    query_full, 
+    full_query, 
     retmax=retMax,
     type="esearch", db="pubmed")
 
