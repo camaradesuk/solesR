@@ -464,7 +464,7 @@ epmc_search <- function(query = NULL, timespan, retMax = 5000, format_soles = TR
   }
   
   # Add timespan to query
-  query <- paste0(query, " AND FIRST_IDATE:[", as.character(min_date_char), " TO ", as.character(max_date_char),"]")
+  query <- paste0("(", query, ") AND FIRST_IDATE:[", as.character(min_date_char), " TO ", as.character(max_date_char),"]")
   
   # Print message
   message("Running EuropePMC search...")
