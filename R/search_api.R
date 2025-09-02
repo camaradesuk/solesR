@@ -329,13 +329,14 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
 
   # Print message
   message("Running PubMed search...")
+  
+  # Add dates to query
+  query_full <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Modification])")
 
   # Get summary of NCBI EUtils query
   pubmed_search <- RISmed::EUtilsSummary(
-    query, 
+    query_full, 
     retmax=retMax,
-    mindate = paste0(format(min_date_char, "%Y/%m/%d")),
-    maxdate=paste0(format(max_date_char, "%Y/%m/%d")),
     type="esearch", db="pubmed")
 
   # Get summary
