@@ -75,6 +75,8 @@ combine_searches <- function(...) {
 #' @param citations a dataframe of all new citations retrieved
 #' @return dataframe of new citations, new citations appended to retrieved_citations AWS table
 #' @export
+#' 
+#' @import DBI
 #'
 check_if_retrieved <- function(con, citations) {
   # Check citations is a dataframe
@@ -104,7 +106,7 @@ check_if_retrieved <- function(con, citations) {
     rename(label = .data$date)
 
   # Append to existing table
-  dbWriteTable(con, "retrieved_citations", new_citations_write, append = TRUE)
+  DBI::dbWriteTable(con, "retrieved_citations", new_citations_write, append = TRUE)
 
   # Print result
   message(nrow(new_citations_write), " new records found and appended to 'retrieved_citations' table")
