@@ -117,6 +117,8 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
       dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$scopusID))
+    # Print message
+    message("Formatted!")
   }
 
   # Change no abstract available to NA
@@ -272,6 +274,8 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
       ) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$ut))
+    # Print message
+    message("Formatted!")
   }
 
   # Change no abstract available to NA
@@ -552,6 +556,8 @@ epmc_search <- function(query = NULL, timespan, retMax = 5000, format_soles = TR
       dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$uid))
+    # Print message
+    message("Formatted!")
   }
   
   # Change no abstract available to NA
