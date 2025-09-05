@@ -34,6 +34,7 @@ Imports:
     rcrossref,
     fuzzyjoin,
     XML,
+    XML2,
     openalexR,
     purrr,
     openxlsx,
