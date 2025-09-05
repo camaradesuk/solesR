@@ -30,13 +30,13 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
   # Check fill_table input is valid
   if(!is.null(fill_table)){
-    if (!(fill_table %in% c(
+    if (!(all(fill_table %in% c(
       "funder_grant_tag", 
-      "disciline_tag", 
+      "discipline_tag", 
       "institution_tag", 
       "citation_count_tag", 
       "retraction_tag", 
-      "oa_tag"))) {
+      "oa_tag")))) {
       stop("'fill_table' is not valid database table name.")
     }
   }
