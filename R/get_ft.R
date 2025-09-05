@@ -756,7 +756,7 @@ ft_elsevier <- function(doi, uid, elsevier_token, ft_path, ft_name_style = "doi"
 #' 
 #' @import rcrossref
 #' @import europepmc
-#' @import XML2
+#' @import xml2
 #' @import utils
 #' @import dplyr
 #'
