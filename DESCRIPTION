@@ -71,7 +71,8 @@ Imports:
     httr,
     jsonlite,
     caret,
-    rsample
+    rsample,
+    europepmc
 VignetteBuilder: knitr
 Remotes: 
     kaitlynhair/RISmed,

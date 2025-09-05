@@ -5,9 +5,11 @@
 #' Requires `devtools::install_github(kaitlynhair/scopusAPI)`.
 #' Requires an API key from Scopus (http://dev.elsevier.com/).
 #' Use the function `usethis::edit_r_environ()` to add the key to your ~/.Renviron file.
+#' The timespan should be formatted as a number followed by the word "week" or "month", e.g. "1month" or "2week".
 #'
 #' @param query a character string containing a correctly syntaxed Scopus search
 #' @param api_key a working Scopus API key
+#' @param timespan a formatted character string defining the timespan you want to search
 #' @param retMax The maximum number of records to retrieve, default is 2000, maximum is 5000
 #' @param format_soles boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE
 #' @return a dataframe containing Scopus search results
@@ -21,7 +23,7 @@
 #' @import scopusAPI
 #' @export
 #'
-scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_soles = TRUE) {
+scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax = 2000, format_soles = TRUE) {
   # Check for query and exit if NULL
   if (is.null(query)) {
     stop(message("Error: you have not entered a search query"))
@@ -46,6 +48,42 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
   if (is.logical(format_soles) == FALSE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
   }
+  
+  # Check for API key and exit if NULL
+  if (is.null(timespan)) {
+    stop(message("Error: you have not entered a timespan for the search"))
+  }
+  
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
+    stop(message("Error: timespan format incorrect"))
+  }
+  
+  # Define timespan for search
+  if (grepl("(?i)week", timespan) == TRUE) {
+    # Get number of weeks by removing non-digit characters
+    x <- as.numeric(gsub("\\D", "", timespan))
+    # Assign min date as x number of weeks before today's date
+    min_date_char <- Sys.Date() - 7 * x
+    # Assign max date as today
+    max_date_char <- Sys.Date()
+    # Print search dates
+    message("Searching from ", min_date_char, " to ", max_date_char)
+  } else if (grepl("(?i)month", timespan) == TRUE) {
+    # Get number of months by removing non-digit characters
+    x <- as.numeric(gsub("\\D", "", timespan))
+    # Assign min date as x number of months before today's date
+    min_date_char <- Sys.Date() - 31 * x
+    # Assign max date as today
+    max_date_char <- Sys.Date()
+    # Print search dates
+    message("Searching from ", min_date_char, " to ", max_date_char)
+  }
+  
+  # Minus one day from min date (because scopus only searches after this date)
+  min_date_char <- min_date_char - 1
+  
+  # Append timespan to user query to define final query
+  full_query <- paste0("(", query, ") AND LOAD-DATE >", min_date_char)
 
   # Print message
   message("Running Scopus search...")
@@ -55,7 +93,7 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
     {
       # Try getting results
       scopus_results <- scopusAPI::search_scopus(
-        string = query,
+        string = full_query,
         api_key = api_key,
         retMax = retMax
       )
@@ -79,6 +117,8 @@ scopus_search <- function(query = NULL, api_key = NULL, retMax = 2000, format_so
       dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$scopusID))
+    # Print message
+    message("Formatted!")
   }
 
   # Change no abstract available to NA
@@ -139,7 +179,7 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
   }
 
-  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
 
@@ -234,6 +274,8 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
       ) %>%
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$ut))
+    # Print message
+    message("Formatted!")
   }
 
   # Change no abstract available to NA
@@ -302,7 +344,7 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
     stop(message("Error: retMax is too high"))
   }
 
-  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
 
@@ -329,13 +371,14 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
 
   # Print message
   message("Running PubMed search...")
+  
+  # Add dates to query
+  full_query <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Modification]")
 
   # Get summary of NCBI EUtils query
   pubmed_search <- RISmed::EUtilsSummary(
-    query, 
+    full_query, 
     retmax=retMax,
-    mindate = paste0(format(min_date_char, "%Y/%m/%d")),
-    maxdate=paste0(format(max_date_char, "%Y/%m/%d")),
     type="esearch", db="pubmed")
 
   # Get summary
@@ -391,4 +434,145 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
 
   # Return results
   return(pubmed_results)
+}
+
+#' Search EuropePMC and retrieve bibliographic data using europepmc
+#'
+#' @description
+#' A wrapper function for europepmc. Search EuropePMC using a query and retrieve results programmatically.
+#'
+#' @param query a character string containing a correctly syntaxed EuropePMC search
+#' @param timespan a formatted character string defining the timespan you want to search
+#' @param retMax The maximum number of records to retrieve, default is 5000, maximum is 5000
+#' @param format_soles boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE
+#' @return a dataframe containing EuropePMC search results
+#' @examples
+#' \dontrun{
+#' query <- "TITLE_ABS:(dementia OR \"memory loss\")"
+#' epmc_result <- epmc_search(query, timespan, retMax = 500, format_soles = FALSE)
+#' }
+#' @import dplyr
+#' @import europepmc
+#' @export
+#'
+epmc_search <- function(query = NULL, timespan, retMax = 5000, format_soles = TRUE) {
+  # Check for query and exit if NULL
+  if (is.null(query)) {
+    stop(message("Error: you have not entered a search query"))
+  }
+  
+  # Check for API key and exit if NULL
+  if (is.null(timespan)) {
+    stop(message("Error: you have not entered a timespan for the search"))
+  }
+  
+  # Check format_soles is boolean and exit if not
+  if (is.logical(format_soles) == FALSE) {
+    stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
+  }
+  
+  # Check if retMax is a positive integer and exit if not
+  if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
+    stop(message("Error: retMax is not a whole number"))
+  }
+  
+  # Check retMax and exit if above maximum
+  if (retMax > 5000) {
+    stop(message("Error: retMax is too high"))
+  }
+  
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
+    stop(message("Error: timespan format incorrect"))
+  }
+  
+  # Define timespan for search
+  if (grepl("(?i)week", timespan) == TRUE) {
+    # Get number of weeks by removing non-digit characters
+    x <- as.numeric(gsub("\\D", "", timespan))
+    # Assign min date as x number of weeks before today's date
+    min_date_char <- Sys.Date() - 7 * x
+    # Assign max date as today
+    max_date_char <- Sys.Date()
+    # Print search dates
+    message("Searching from ", min_date_char, " to ", max_date_char)
+  } else if (grepl("(?i)month", timespan) == TRUE) {
+    # Get number of months by removing non-digit characters
+    x <- as.numeric(gsub("\\D", "", timespan))
+    # Assign min date as x number of months before today's date
+    min_date_char <- Sys.Date() - 31 * x
+    # Assign max date as today
+    max_date_char <- Sys.Date()
+    # Print search dates
+    message("Searching from ", min_date_char, " to ", max_date_char)
+  }
+  
+  # Add timespan to query
+  query <- paste0("(", query, ") AND FIRST_IDATE:[", as.character(min_date_char), " TO ", as.character(max_date_char),"]")
+  
+  # Print message
+  message("Running EuropePMC search...")
+  
+  # Try running search query using scopusAPI R package
+  epmc_results <- tryCatch(
+    {
+      # Try getting results
+      europepmc::epmc_search(query, limit = retMax)
+    },
+    error = function(e) {
+      # Print error message and exit if error occurred
+      stop("Error in calling europepmc::epmc_search", conditionMessage(e))
+    }
+  )
+  
+  # Return results if successful
+  message("Retrieved ", nrow(epmc_results), "records from EuropePMC")
+  
+  # Format for SOLES workflow if format_soles == TRUE
+  if (format_soles == TRUE) {
+    # Print message
+    message("Formatting records for SOLES...")
+    # Rename and create columns for SOLES
+    epmc_results <- epmc_results %>%
+      dplyr::mutate(uid = paste0("epmc-", tolower(id)),
+                    source = "epmc",
+                    journal = NA,
+                    pages = NA,
+                    volume = NA,
+                    abstract = NA,
+                    isbn = NA,
+                    keywords = NA,
+                    secondarytitle = NA,
+                    url = NA,
+                    issn = NA,
+                    pmid = NA,
+                    author_country = NA,
+                    number = NA,
+                    author_affiliation = NA) %>%
+      dplyr::select(uid, source, doi, title, author = authorString,
+                    year = pubYear, ptype = pubType, journal, pages,
+                    volume, abstract, isbn, keywords, secondarytitle,
+                    url, issn, pmid, author_country, number, author_affiliation) %>%
+      # Format search date as character in format DDMMYY
+      dplyr::mutate(date = format(Sys.Date(), "%d%m%y")) %>%
+      # Remove rows with no ID
+      dplyr::filter(!is.na(.data$uid))
+    # Print message
+    message("Formatted!")
+  }
+  
+  # Change no abstract available to NA
+  epmc_results$abstract <- gsub("^\\[No abstract available\\]$", "", epmc_results$abstract)
+  # Change all "NA" to real NA
+  epmc_results[epmc_results == "NA"] <- NA
+  # Change all blanks to NA
+  epmc_results[epmc_results == ""] <- NA
+  
+  # Make DOI lowercase
+  epmc_results$doi <- tolower(epmc_results$doi)
+  
+  # Remove any additional DOIs (e.g., elife versioning)
+  epmc_results$doi <- gsub("; .+$", "", epmc_results$doi)
+  
+  # Return search results
+  return(epmc_results)
 }

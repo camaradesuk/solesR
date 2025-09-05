@@ -4,12 +4,20 @@
 \alias{scopus_search}
 \title{Search Scopus and retrieve bibliographic data using scopusAPI}
 \usage{
-scopus_search(query = NULL, api_key = NULL, retMax = 2000, format_soles = TRUE)
+scopus_search(
+  query = NULL,
+  api_key = NULL,
+  timespan = NULL,
+  retMax = 2000,
+  format_soles = TRUE
+)
 }
 \arguments{
 \item{query}{a character string containing a correctly syntaxed Scopus search}
 
 \item{api_key}{a working Scopus API key}
+
+\item{timespan}{a formatted character string defining the timespan you want to search}
 
 \item{retMax}{The maximum number of records to retrieve, default is 2000, maximum is 5000}
 
@@ -23,6 +31,7 @@ A wrapper function for scopusAPI. Search Scopus using a query and retrieve resul
 Requires \code{devtools::install_github(kaitlynhair/scopusAPI)}.
 Requires an API key from Scopus (http://dev.elsevier.com/).
 Use the function \code{usethis::edit_r_environ()} to add the key to your ~/.Renviron file.
+The timespan should be formatted as a number followed by the word "week" or "month", e.g. "1month" or "2week".
 }
 \examples{
 \dontrun{
