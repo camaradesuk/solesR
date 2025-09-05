@@ -54,7 +54,7 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
     stop(message("Error: you have not entered a timespan for the search"))
   }
   
-  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
   
@@ -179,7 +179,7 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
   }
 
-  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
 
@@ -344,7 +344,7 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
     stop(message("Error: retMax is too high"))
   }
 
-  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
 
@@ -481,7 +481,7 @@ epmc_search <- function(query = NULL, timespan, retMax = 5000, format_soles = TR
     stop(message("Error: retMax is too high"))
   }
   
-  if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+  if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
   
