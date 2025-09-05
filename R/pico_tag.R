@@ -536,3 +536,83 @@ complete_pico_tag <- function(con, tag_method = "", tag_type = "", tag_main_cate
     message(paste0(total_new_tags, " out of a possible ", length(to_tag$uid), " tagged for ", tag_type))
   }
 }
+
+#' Pico Retag
+#'
+#' @description
+#' A function to update your pico tags when changes to the pico dictionary have been made. This function
+#' uses the `complete_pico_tag()` and may take a long time to run. It is therefore recommended to schedule 
+#' it as a background process.
+#' @param con a database connection
+#' @param tag_type A string specifying the PICO tag type to re-tag. Must match a value in the
+#'        `type` column of the `pico_ontology` database table.
+#' @param tag_method A string specifying the tagging method to use. Options are:
+#'   \itemize{
+#'     \item `"both"` — re-tag using both `tiabkw` and `fulltext`.
+#'     \item `"tiabkw"` — re-tag using title/abstract keywords.
+#'     \item `"fulltext"` — re-tag using full text.
+#'   }
+#'   Default is `"both"`.
+#' 
+#' @return The function updates the `pico_tag` table in the database. 
+#' @examples
+#' \dontrun{
+#' # Re-tag interventions using both tiabkw and fulltext
+#' pico_retag(con, tag_type = "intervention", tag_method = "both")
+#'
+#' # Re-tag outcomes using only tiabkw
+#' pico_retag(con, tag_type = "outcome", tag_method = "tiabkw")
+#' }
+#' @import dplyr
+#' @export
+#'
+pico_retag <- function(con, tag_type, tag_method = "both"){
+  
+  # Check the input for tag_method
+  if (!tag_method %in% c("both", "tiabkw", "fulltext")) {
+    stop(message("Error: you have not entered a valid tag_method"))
+  }
+  
+  pico_ont <- DBI::dbReadTable(con, "pico_ontology")
+  
+  # Check the input for tag_type
+  if (!tag_type %in% unique(pico_ont$type)) {
+    stop(message("Error: you have not entered a valid tag_type"))
+  }
+  
+  message(paste0("Removing current tags for ", tag_type, " from the database..."))
+  
+  # Get regex IDs
+  pico_ont <- pico_ont %>%
+    filter(type == tag_type) %>%
+    pull(regex_id)
+  
+  # Remove all of the tags from the specified "type"
+  pico_tagged <- dbReadTable(con, "pico_tag") %>%
+    filter(!regex_id %in% pico_ont)
+  
+  # Remove the appropriate tagged studies from the database
+  DBI::dbWriteTable(con, "pico_tag", pico_tagged, overwrite = TRUE)
+  
+  # To tag tiabkw and fulltext
+  if (tag_method == "both"){
+    
+    message(paste0("Re-tagging the tiabkw and fulltext for ", tag_type, "..."))
+    
+    try(solesR::complete_pico_tag(con = con, 
+                                  tag_method = "tiabkw", 
+                                  tag_type = tag_type))
+    
+    try(solesR::complete_pico_tag(con = con, 
+                                  tag_method = "fulltext", 
+                                  tag_type = tag_type))
+    
+  } else {
+    
+    message(paste0("Re-tagging the ", tag_method, " for ", tag_type, "..."))
+    
+    try(solesR::complete_pico_tag(con = con, 
+                                  tag_method = tag_method, 
+                                  tag_type = tag_type))
+  }
+}
