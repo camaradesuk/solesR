@@ -4,12 +4,14 @@
 \alias{get_screening_decisions}
 \title{Get Screening Decisions from the Database}
 \usage{
-get_screening_decisions(con, review_id = "")
+get_screening_decisions(con, review_id = "", classifier_name = NULL)
 }
 \arguments{
 \item{con}{A database connection object.}
 
 \item{review_id}{A unique identifier for the review associated with the screening decisions.}
+
+\item{classifier_name}{Name of classifier used in study_classification table (e.g. "in-vivo)}
 }
 \value{
 A data frame containing screening decisions with columns: ITEM_ID, LABEL, TITLE, ABSTRACT, KEYWORDS, Cat, REVIEW_ID.
@@ -20,9 +22,6 @@ in the specified database and returns a data frame in the correct format to run 
 }
 \examples{
 \dontrun{
-screening_decisions <- get_screening_decisions(
-  con = your_database_connection, 
-  review_id = "your_project_plus_date"
-)
+  screening_decisions <- get_screening_decisions(con = your_database_connection, review_id = "your_project_plus_date", classifier_name = "in-vivo")
 }
 }
