@@ -63,29 +63,42 @@ get_studies_to_screen <- function(con, classify_NA = FALSE, project_name, classi
 #'
 #' @param con A database connection object.
 #' @param review_id A unique identifier for the review associated with the screening decisions.
+#' @param classifier_name Name of classifier used in study_classification table (e.g. "in-vivo)
 #'
 #' @return A data frame containing screening decisions with columns: ITEM_ID, LABEL, TITLE, ABSTRACT, KEYWORDS, Cat, REVIEW_ID.
 #'
 #' @examples
 #' \dontrun{
-#' screening_decisions <- get_screening_decisions(
-#'   con = your_database_connection, 
-#'   review_id = "your_project_plus_date"
-#' )
+#'   screening_decisions <- get_screening_decisions(con = your_database_connection, review_id = "your_project_plus_date", classifier_name = "in-vivo")
 #' }
 #' @import dplyr
 #' @export
 #'
-get_screening_decisions <- function(con, review_id = ""){
+get_screening_decisions <- function(con, review_id = "", classifier_name = NULL){
   
-  screening_decisions <- tbl(con, "study_classification") %>%
-    filter(type == "human_reviewer") %>%
-    left_join(tbl(con, "unique_citations"), by = "uid") %>%
-    select(ITEM_ID = uid, LABEL = decision, TITLE = title, ABSTRACT = abstract, KEYWORDS = keywords) %>%
-    mutate(LABEL = ifelse(LABEL == "include", 1, 0),
-           Cat = "",
-           REVIEW_ID = review_id) %>%
-    collect()
+  if (!is.null(classifier_name)){
+    
+    screening_decisions <- tbl(con, "study_classification") %>%
+      filter(type == "human_reviewer") %>%
+      filter(name %in% classifier_name) %>%  
+      left_join(tbl(con, "unique_citations"), by = "uid") %>%
+      select(ITEM_ID = uid, LABEL = decision, TITLE = title, ABSTRACT = abstract, KEYWORDS = keywords) %>%
+      mutate(LABEL = ifelse(LABEL == "include", 1, 0),
+             Cat = "",
+             REVIEW_ID = review_id) %>%
+      collect()
+    
+  } else {
+    
+    screening_decisions <- tbl(con, "study_classification") %>%
+      filter(type == "human_reviewer") %>%
+      left_join(tbl(con, "unique_citations"), by = "uid") %>%
+      select(ITEM_ID = uid, LABEL = decision, TITLE = title, ABSTRACT = abstract, KEYWORDS = keywords) %>%
+      mutate(LABEL = ifelse(LABEL == "include", 1, 0),
+             Cat = "",
+             REVIEW_ID = review_id) %>%
+      collect()
+  }
   
   return(screening_decisions)
   
