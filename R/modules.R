@@ -9,7 +9,7 @@
 #' @param table The input data table.
 #'
 #' @export
-yearBarUI <- function(id, title = "", theme = "", spinner_colour = "#96c296", table) {
+yearBarUI <- function(id, title = "", theme = "", spinner_colour = "#76A8C1", table) {
   
   ns <- NS(id)
   
@@ -58,42 +58,45 @@ yearBarUI <- function(id, title = "", theme = "", spinner_colour = "#96c296", ta
 #' @param colours Colors for the chart elements.
 #'
 #' @export
-yearBarServer <- function(id, table, column, order = c("reported", "not reported"), 
-                          display="reported", text="", colours = c("#73D055FF", "grey")){
+yearBarServer <- function(id, table, column, order = c("reported", "not reported", "unknown"), 
+                          display="reported", text="", colours = c("#76A8C1", "#FFC076", "grey")){
   moduleServer(
     id,
     function(input, output, session) {
       output$plot <- renderPlotly({
         
+        cols <- setNames(colours, order)
+        
+        
         if(input$switch_to_percentage){
           
           if(length(display)>1){
-            
-            x <- ggplot2::enquo(column)
-            cols <- setNames(colours, order)
-            
-            table <- table %>%
-              mutate(x = factor(!!rlang::sym(column), levels = order))
             
             table %>%
               filter(!year == "unknown") %>%
               filter(!year == "") %>%
               filter(year >= min(input$year_bar_slider), 
                      year <= max(input$year_bar_slider)) %>%
-              select(uid, year, x) %>%
+              select(uid, year, data_col = .data[[column]]) %>%
               distinct() %>%
               select(-uid) %>%
               group_by_all() %>%
               count() %>%
               group_by(year) %>%
               mutate(percent = n/sum(n) * 100) %>%
-              filter(x %in% display) %>%
+              filter(data_col %in% display) %>%
               ungroup() %>%
+              mutate(data_col = factor(data_col, levels = order)) %>% 
               plot_ly(x = ~year,
                       type = 'bar',
                       y = ~percent,
                       colors = cols,
-                      color = ~x) %>%
+                      color = ~data_col,
+                      marker = list(line = list(color = 'black', width = 1)),
+                      text = ~paste("<b>Info:</b> ", data_col,
+                                    "<br><b>Year:</b> ", year,
+                                    "<br><b>Percentage:</b>", round(percent, 2), "<b>%<b>"),
+                      hoverinfo = "text") %>%
               layout(showlegend = TRUE,
                      yaxis = list(title = paste0("% of publications (", display, ")"), range = c(0, 100)),
                      xaxis = list(title = ""), barmode = "stack",
@@ -105,12 +108,10 @@ yearBarServer <- function(id, table, column, order = c("reported", "not reported
             
           } else {
             
-            x <- ggplot2::enquo(column)
             
             table %>%
-              filter(!year == "unknown") %>%
-              filter(!year == "") %>%
-              select(uid, year, !!x) %>%
+              filter(!year == "unknown", !year == "") %>%
+              select(uid, year, data_col = .data[[column]]) %>%
               filter(year >= min(input$year_bar_slider), 
                      year <= max(input$year_bar_slider)) %>%
               distinct() %>%
@@ -119,13 +120,17 @@ yearBarServer <- function(id, table, column, order = c("reported", "not reported
               count() %>%
               group_by(year) %>%
               mutate(percent = n/sum(n) * 100) %>%
-              filter(!!rlang::sym(column) %in% display) %>%
+              mutate(
+                data_col = factor(data_col, levels = c(TRUE, FALSE)) 
+              ) %>%              
               plot_ly(x = ~year, 
                       y = ~percent,
-                      mode = "markers", 
-                      marker = list(color = first(colours)),
+                      type = "bar",
+                      color = ~data_col,
+                      colors = cols,
                       hoverinfo = 'text',
                       textposition = "none",
+                      marker = list(line = list(color = 'black', width = 1)),
                       text = ~paste("<b>Year:</b> ", year,
                                     "<br><b>Percentage:</b>", round(percent, 2), "<b>%<b>")
               ) %>%
@@ -141,29 +146,25 @@ yearBarServer <- function(id, table, column, order = c("reported", "not reported
           
         } else {
           
-          x <- ggplot2::enquo(column)
-          cols <- setNames(colours, order)
-          
-          table <- table %>%
-            mutate(x = factor(!!rlang::sym(column), levels = order))
           
           table %>%
-            filter(!year == "unknown") %>%
-            filter(!year == "") %>%
+            filter(!year == "unknown", !year == "") %>%
             filter(year >= min(input$year_bar_slider), 
                    year <= max(input$year_bar_slider)) %>%
-            select(uid, year, x) %>%
+            select(uid, year, data_col = .data[[column]]) %>%
             distinct() %>%
-            group_by(year, x) %>%
+            group_by(year, data_col) %>%
             count() %>%
+            mutate(data_col = factor(data_col, levels = order)) %>% 
             plot_ly(x = ~year,
                     type = 'bar',
                     y = ~n,
                     colors = cols,
-                    color = ~x,
+                    color = ~data_col,
                     hoverinfo = 'text',
                     textposition = "none",
-                    text = ~paste("<b>Info:</b> ", x,
+                    marker = list(line = list(color = 'black', width = 1)),
+                    text = ~paste("<b>Info:</b> ", data_col,
                                   "<br><b>Number of Publications:</b>", n,
                                   "<br><b>Year:</b>", year)) %>%
             layout(showlegend = TRUE,
@@ -248,106 +249,48 @@ yearBarServer_included_only <- function(id, table, column,
     function(input, output, session) {
       output$plot <- renderPlotly({
         
-        x <- ggplot2::enquo(column)
-        
-        table <- table %>%
-          mutate(x = factor(!!rlang::sym(column)))
-        
         table %>%
-          filter(!year == "unknown") %>%
-          filter(!year == "") %>%
-          filter(x == "included") %>%
-          filter(year >= min(input$included_year_slider), 
-                 year <= max(input$included_year_slider)) %>%
-          group_by(year, x) %>%
-          count() %>%
-          plot_ly(x = ~year,
-                  type = 'bar',
-                  y = ~n,
-                  colors = colour,
-                  color = ~x,
-                  hoverinfo = 'text',
-                  textposition = "none",
-                  text = ~paste("<br><b>Number of Publications:</b>", n,
-                                "<br><b>Year:</b>", year)) %>%
-          layout(showlegend = FALSE,
-                 yaxis = list(title = 'Number of publications'),
-                 xaxis = list(title = "", tickangle = -45, ticklen = 4), barmode='stack',
-                 hoverlabel = list(bgcolor = "white", 
-                                   font = list(size = 14)),
-                 annotations =
-                   list(x = 1, y = -0.2, text = text,
-                        showarrow = F, xref='paper', yref='paper',
-                        xanchor='right', yanchor='bottom', xshift=0, yshift=0,
-                        font=list(size=12, color="black")))  
+          filter(
+            year != "unknown",
+            year != "",
+            .data[[column]] == "included",
+            year >= min(input$included_year_slider),
+            year <= max(input$included_year_slider)
+          ) %>%
+          count(year, data_col = .data[[column]]) %>%
+          plot_ly(
+            x = ~year,
+            y = ~n,
+            type = 'bar',
+            color = ~data_col,
+            colors = colour,
+            hoverinfo = 'text',
+            textposition = "none",
+            text = ~paste(
+              "<br><b>Number of Publications:</b>", n,
+              "<br><b>Year:</b>", year
+            ),
+            marker = list(
+              line = list(color = 'black', width = 1)   # <-- thin black border
+            )
+          ) %>%
+          layout(
+            showlegend = FALSE,
+            yaxis = list(title = 'Number of publications'),
+            xaxis = list(title = "", tickangle = -45, ticklen = 4),
+            barmode = 'stack',
+            hoverlabel = list(bgcolor = "white", font = list(size = 14)),
+            annotations = list(
+              x = 1, y = -0.2, text = text,
+              showarrow = FALSE, xref = 'paper', yref = 'paper',
+              xanchor = 'right', yanchor = 'bottom', xshift = 0, yshift = 0,
+              font = list(size = 12, color = "black")
+            )
+          )
+        
       })
     }
   )}
-
-#' Generate a Pie Chart Indicating Completion
-#'
-#' This Shiny module creates a pie chart indicating the completion percentage based on a specified table and column. The chart displays the count of occurrences of the values of the selected column and includes a legend with a color-coded representation of those values. Intended for use within a Shiny application.
-#'
-#' @param id The module identifier.
-#'
-#' @export
-completionPieUI <- function(id) {
-  ns <- NS(id)
-  
-  plotlyOutput(ns("plot"), height="150px")
-}
-
-
-#' Generate a Pie Chart for Tagging Completion
-#'
-#' This server function generates a pie chart indicating the completion percentage of tagging based on the provided inputs. The chart represents the percentage of occurrences of the values in the specified column for each category (complete or not complete). It also offers an option to remove failed status rows and displays the completion percentage with a color-coded legend.
-#'
-#' @param id The module identifier.
-#' @param table The data table to use for generating the chart.
-#' @param identifier The name of the column to use for generating the chart.
-#' @param included_studies The table used for bringing in included studies.
-#' @param remove_failed Logical, indicating whether to remove rows with status "failed". Default is FALSE.
-#'
-#' @export
-completionPieServer <- function(id, table, identifier, included_studies, remove_failed = FALSE){
-  moduleServer(
-    id,
-    function(input, output, session) {
-      
-      output$plot <- renderPlotly({
-        
-        colors <- c("#450e44", '#808080')
-        
-        if(remove_failed == TRUE){
-          
-          table <- table %>%
-            filter(!status == "failed")
-          table$status <- "tagged"
-          
-        } else {
-          
-          table$status <- "tagged"
-        }
-        
-        df_count <- included_studies %>%
-          left_join(table, by=identifier, multiple="all") %>%
-          mutate(cat = ifelse(is.na(status), "Not Complete", "Complete")) %>%
-          select(uid, cat) %>%
-          distinct() %>%
-          group_by(cat) %>%
-          count()
-        
-        plot_ly(type='pie', labels=df_count$cat, values=df_count$n,
-                textinfo='label+percent',
-                marker = list(colors = colors,
-                              line = list(color = '#FFFFFF', width = 2)),
-                insidetextorientation='radial') %>% 
-          layout(showlegend = FALSE,
-                 margin = list(b = 30, l = 30, r = 30, t = 30, pad = 0, autoexpand = TRUE))
-        
-      })
-    })
-}
 
 
 #' Box Containing Pie Chart Indicating Completion
@@ -387,66 +330,47 @@ pie_completion_UI <- function(id, title, theme, spinner_colour, info_text) {
 #' @param included_studies The table used for bringing in included studies.
 #' @param colour_not_complete The colour for the section of pie showing "not complete".
 #' @param colour_complete The colour for the section of pie showing "complete".
-#' @param remove_failed Removes the rows where the status == "failed".
-#' @param incl_missing_doi Includes the number of studies missing a doi to the chart == "failed".
+#' @param incl_missing_doi For tables which are linked by DOI and also want to show % without a DOI in the chart
 #'
 #' @export
-pie_completion_Server <- function(id, table, identifier, included_studies, colour_not_complete, colour_complete, incl_missing_doi = FALSE, remove_failed = FALSE){
+pie_completion_Server <- function(id, table, identifier, included_studies, colour_not_complete, colour_complete, incl_missing_doi = FALSE){
   moduleServer(
     id,
     function(input, output, session) {
       
       output$plot <- renderPlotly({
         
+        
         # If the user is wanting to include missing doi number in pie chart
         if(incl_missing_doi == TRUE){
           
-          # If the user wants to remove the failed status - used for pdf retrieval %
-          if (remove_failed == TRUE) {
-            
-            table <- table %>%
-              filter(status == "found")
-            
-          }
-          
-          table$status <- "tagged"
-          
-          df_count <- included_studies %>%
-            left_join(table, by = identifier, multiple = "all") %>%
-            mutate(doi_final = if ("doi.x" %in% colnames(.)) doi.x else doi) %>%
-            mutate(cat = ifelse(is.na(status), "Not Complete", "Complete")) %>%
-            mutate(cat = ifelse(doi_final == "" | is.na(doi_final), "Missing DOI", cat)) %>%
-            select(identifier, cat) %>%
-            group_by(cat) %>%
-            count() %>%
-            ungroup() %>%
+          df_count <- table %>% 
+            count(tag_status) %>% 
             mutate(colour = case_when(
-              cat == "Complete" ~ colour_complete,
-              cat == "Not Complete" ~ colour_not_complete,
+              tag_status == "Complete" ~ colour_complete,
+              tag_status == "Incomplete" ~ colour_not_complete,
               TRUE ~ "#454545"
             ))
           
+          
         } else {
-          
-          table$status <- "tagged"
-          
-          colors <- c(colour_complete, colour_not_complete)
           
           df_count <- included_studies %>%
             left_join(table, by=identifier, multiple="all") %>%
-            mutate(cat = ifelse(is.na(status), "Not Complete", "Complete")) %>%
-            select(identifier, cat) %>%
-            group_by(cat) %>%
+            mutate(tag_status = ifelse(is.na(status), "Incomplete", "Complete")) %>%
+            select(identifier, tag_status) %>%
+            group_by(tag_status) %>%
             count() %>% 
             ungroup() %>% 
             mutate(colour = case_when(
-              cat == "Complete" ~ colour_complete,
-              cat == "Not Complete" ~ colour_not_complete,
+              tag_status == "Complete" ~ colour_complete,
+              tag_status == "Incomplete" ~ colour_not_complete,
               TRUE ~ "#454545" 
             ))
+          
         }
         
-        plot_ly(type='pie', labels=df_count$cat, values=df_count$n,
+        plot_ly(type='pie', labels=df_count$tag_status, values=df_count$n,
                 textinfo='label+percent',
                 marker = list(colors = df_count$colour,
                               line = list(color = '#FFFFFF', width = 2)),
@@ -458,7 +382,6 @@ pie_completion_Server <- function(id, table, identifier, included_studies, colou
       })
     })
 }
-
 
 
 #' Generate a Sunburst Plot UI
