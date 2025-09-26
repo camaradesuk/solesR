@@ -361,6 +361,7 @@ pie_completion_Server <- function(id, table, identifier, included_studies, colou
             left_join(table, by=identifier, multiple="all") %>%
             mutate(tag_status = ifelse(is.na(status), "Incomplete", "Complete")) %>%
             select(identifier, tag_status) %>%
+            distinct() %>% 
             group_by(tag_status) %>%
             count() %>% 
             ungroup() %>% 
