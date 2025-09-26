@@ -8,10 +8,10 @@ yearBarServer(
   id,
   table,
   column,
-  order = c("reported", "not reported"),
+  order = c("reported", "not reported", "unknown"),
   display = "reported",
   text = "",
-  colours = c("#73D055FF", "grey")
+  colours = c("#76A8C1", "#FFC076", "grey")
 )
 }
 \arguments{

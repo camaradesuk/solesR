@@ -11,8 +11,7 @@ pie_completion_Server(
   included_studies,
   colour_not_complete,
   colour_complete,
-  incl_missing_doi = FALSE,
-  remove_failed = FALSE
+  incl_missing_doi = FALSE
 )
 }
 \arguments{
@@ -28,9 +27,7 @@ pie_completion_Server(
 
 \item{colour_complete}{The colour for the section of pie showing "complete".}
 
-\item{incl_missing_doi}{Includes the number of studies missing a doi to the chart == "failed".}
-
-\item{remove_failed}{Removes the rows where the status == "failed".}
+\item{incl_missing_doi}{For tables which are linked by DOI and also want to show \% without a DOI in the chart}
 }
 \description{
 This shiny module generates a box containing a pie chart showing the tagged completion percentage of a given dataframe. This can also

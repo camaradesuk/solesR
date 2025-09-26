@@ -4,7 +4,7 @@
 \alias{yearBarUI}
 \title{Generate a Yearly Bar Chart}
 \usage{
-yearBarUI(id, title = "", theme = "", spinner_colour = "#96c296", table)
+yearBarUI(id, title = "", theme = "", spinner_colour = "#76A8C1", table)
 }
 \arguments{
 \item{id}{The module identifier.}

@@ -7,6 +7,7 @@
 evidence_map_Server(
   id,
   citations_metadata = citations_for_dl,
+  pico_data,
   x_axis_table,
   y_axis_table,
   legend_table,

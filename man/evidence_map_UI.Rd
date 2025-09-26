@@ -4,15 +4,12 @@
 \alias{evidence_map_UI}
 \title{Evidence Map UI Module}
 \usage{
-evidence_map_UI(id, switch_label = "", guidance_text = "")
+evidence_map_UI(id, switch_label = "")
 }
 \arguments{
 \item{id}{The module identifier. Used to namespace the module's UI components.}
 
 \item{switch_label}{A string for the label of the comparison mode toggle switch.}
-
-\item{guidance_text}{A string containing guidance or instructional text to display in the sidebar
-of the evidence map plot.}
 }
 \value{
 A \code{tagList} containing the UI components for the evidence map module.
