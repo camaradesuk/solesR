@@ -2366,8 +2366,6 @@ download_table_Server <- function(id, table, citations_for_dl) {
 #'
 #' @param id The module identifier. Used to namespace the module's UI components.
 #' @param switch_label A string for the label of the comparison mode toggle switch.
-#' @param guidance_text A string containing guidance or instructional text to display in the sidebar 
-#' of the evidence map plot.
 #'
 #' @return A `tagList` containing the UI components for the evidence map module.
 #'
@@ -2377,11 +2375,14 @@ download_table_Server <- function(id, table, citations_for_dl) {
 #' all organized into three boxes: Filters and Controls, Evidence Map, and Selected Studies.
 #' @export
 evidence_map_UI <- function(id, 
-                            switch_label = "", 
-                            guidance_text = "") {
+                            switch_label = "" 
+) {
   ns <- NS(id)
   
   tagList(
+    tags$head(
+      tags$link(rel = "stylesheet", href = "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css")
+    ),
     box(
       title="Evidence Map",
       width= 12,
@@ -2413,7 +2414,6 @@ evidence_map_UI <- function(id,
         icon = icon("redo"),
         class = "btn-lg")
       
-      
     ),
     box(
       solidHeader = FALSE,
@@ -2423,8 +2423,48 @@ evidence_map_UI <- function(id,
       height = 900,
       sidebar = boxSidebar(
         id = ns("evidence_map_sidebar"),
-        icon = icon("info-circle"),
-        guidance_text
+        icon = tags$div(
+          icon("info-circle", class = "fa-3x text-info", style = "padding: 10px;")
+        ),
+        
+        # guidance_text
+        tags$div(
+          style = "padding: 10px;",
+          
+          tags$h4("Guidance for Evidence Map"),
+          
+          tags$p("Use the plot to visualize evidence on interventions and outcomes. Click the 'Model Comparison' button to include model selection."),
+          
+          tags$p("You can select multiple groups and specific elements to filter the data. The bubbles represent the number of studies, with larger bubbles indicating more studies. Click a bubble to see all the relevant evidence in the table below."),
+          
+          tags$p("If you cannot find a specific intervention, outcome, or model it may be because it is not in our regex dictionary. These will appear under 'Unknown Intervention/Outcome/Model', which you can select from the dropdown menu."),
+          
+          tags$p("You can download study metadata using the ",
+                 icon("download", verify_fa = FALSE), tags$strong(" Download"),
+                 " button located on the table below."),
+          
+          tags$p(
+            "For more advanced filtering options, go to our ",
+            icon("search", verify_fa = FALSE), tags$strong(" Database Search "),
+            "page and click on the ",
+            icon("filter", verify_fa = FALSE), tags$strong(" Filter Studies "),
+            "icon."
+          ),
+          
+          tags$p(tags$strong("How to Interact with the Plot:")),
+          tags$ul(
+            tags$li("Please make your selections and click ", tags$strong("'Render Plot'"), " to display the results."),
+            tags$li("Click on one or multiple bubbles to view the corresponding studies."),
+            tags$li("Double-click anywhere outside the bubbles to de-select your selections."),
+            tags$li("To select multiple bubbles at once, use the box select or lasso tool located at the top-right corner of the plot. Click and drag to draw a box around the bubbles you want to select.")
+          ),
+          tags$br(),
+          tags$p(
+            tags$em("Note:"), " A single study may include multiple interventions, outcomes, or models. 
+    If you select more than one bubble, the total number of studies in the table may be lower than the sum of the publications shown for each bubble."
+          )
+        )
+        
       ),
       
       htmlOutput(ns("error_message")),
@@ -2491,6 +2531,7 @@ evidence_map_UI <- function(id,
 #' @export
 evidence_map_Server <- function(id,
                                 citations_metadata = citations_for_dl,
+                                pico_data,
                                 x_axis_table,
                                 y_axis_table, 
                                 legend_table, 
@@ -2513,6 +2554,8 @@ evidence_map_Server <- function(id,
       
       observeEvent(input$comparison_switch, {
         
+        col_vector(NULL)
+        
         # Preserve current input values
         current_y_axis_maincat_select <- isolate(input$y_axis_maincat_select)
         current_x_axis_maincat_select <- isolate(input$x_axis_maincat_select)
@@ -2523,14 +2566,19 @@ evidence_map_Server <- function(id,
         
         # When switch is used render plot flag to FALSE and disable render button
         render_plot(FALSE)
-
+        
         # Update UI dynamically
         output$picker_inputs_ui <- renderUI({
           
           # If comparison switch is TRUE then all 6 dropdowns
           if (input$comparison_switch){
             
+            legend_group(sort(unique(legend_table[[legend_group_column]])))
+            
+            
+            
             tagList(
+              
               fluidRow(column(width = 4,
                               pickerInput(
                                 inputId = ns("y_axis_maincat_select"),
@@ -2632,7 +2680,6 @@ evidence_map_Server <- function(id,
           
           # else just the 4 dropdowns
           else {
-            
             tagList(
               fluidRow(column(width = 6,
                               pickerInput(
@@ -2703,17 +2750,41 @@ evidence_map_Server <- function(id,
             )
           }
           
+          
+          
         }
         )
         
         # Update input values after UI re-renders
         observe({
+          
+          # Filter based on the selected grouping column
+          y_axis_group <- y_axis_table %>%
+            filter(.data[[y_axis_group_column]] %in% current_y_axis_maincat_select)
+          
+          # Find the distinct values which fit in the grouping
+          y_axis_distinct <- y_axis_group %>%
+            distinct(.data[[y_axis_specific_column]]) %>%
+            arrange(.data[[y_axis_specific_column]]) %>%
+            pull(.data[[y_axis_specific_column]])
+          
+          # Filter based on the selected grouping
+          x_group <- x_axis_table %>%
+            filter(.data[[x_axis_group_column]] %in% current_x_axis_maincat_select)
+          
+          # Find the distinct values which fit in the grouping
+          x_axis_distinct <- x_group %>%
+            distinct(.data[[x_axis_specific_column]]) %>%
+            arrange(.data[[x_axis_specific_column]]) %>%
+            pull(.data[[x_axis_specific_column]])
+          
           updatePickerInput(session, "y_axis_maincat_select", selected = current_y_axis_maincat_select)
           updatePickerInput(session, "x_axis_maincat_select", selected = current_x_axis_maincat_select)
-          updatePickerInput(session, "y_axis_specific_select", selected = current_y_axis_specific_select)
-          updatePickerInput(session, "x_axis_specific_select", selected = current_x_axis_specific_select)
+          updatePickerInput(session, "y_axis_specific_select", selected = current_y_axis_specific_select, choices = sort(y_axis_distinct))
+          updatePickerInput(session, "x_axis_specific_select", selected = current_x_axis_specific_select, choices = sort(x_axis_distinct))
         })
       })
+      
       
       
       
@@ -2727,7 +2798,7 @@ evidence_map_Server <- function(id,
           
           # Enable render plot button and reset click bubble info
           shinyjs::enable("render_evidence_map")
-          click_bubble(NULL)
+          col_vector(NULL)
           
           
           # Update the tracked value of the previous main category
@@ -2736,6 +2807,7 @@ evidence_map_Server <- function(id,
           # Filter based on the selected grouping column
           y_axis_group <- y_axis_table %>%
             filter(.data[[y_axis_group_column]] %in% input$y_axis_maincat_select)
+          
           
           # Find the distinct values which fit in the grouping
           y_axis_distinct <- y_axis_group %>%
@@ -2751,10 +2823,28 @@ evidence_map_Server <- function(id,
                                                     maxOptions = 20,
                                                     actionsBox = TRUE,
                                                     size = 10
-                            ))
+                            )
+          )
+          
+          
         }
       })
       
+      # Reactive value to track the previous main category selection
+      y_axis_specific <- reactiveVal(sort(unique(y_axis_table[[y_axis_specific_column]])))
+      
+      observeEvent(input$y_axis_specific_select, {
+        
+        # Compare current selection with the previous one
+        if (!identical(input$y_axis_specific_select, y_axis_specific())) {
+          
+          # Enable render plot button and reset click bubble info
+          shinyjs::enable("render_evidence_map")
+          col_vector(NULL)
+          
+        }
+      }
+      )
       
       # Reactive value to track the previous main category selection
       x_axis_group <- reactiveVal(sort(unique(x_axis_table[[x_axis_group_column]])))
@@ -2766,7 +2856,7 @@ evidence_map_Server <- function(id,
           
           # Enable render plot button and reset click bubble info
           shinyjs::enable("render_evidence_map")
-          click_bubble(NULL)
+          col_vector(NULL)
           
           
           # Update the tracked value of the previous main category
@@ -2782,6 +2872,7 @@ evidence_map_Server <- function(id,
             arrange(.data[[x_axis_specific_column]]) %>%
             pull(.data[[x_axis_specific_column]])
           
+          
           # Only update picker input's `choices` and `selected` if the main category changes
           updatePickerInput(session, "x_axis_specific_select",
                             choices = sort(x_axis_distinct),
@@ -2790,11 +2881,27 @@ evidence_map_Server <- function(id,
                                                     maxOptions = 20,
                                                     actionsBox = TRUE,
                                                     size = 10
-                            ))
+                            )
+          )
+          
         }
       })
       
+      # Reactive value to track the previous main category selection
+      x_axis_specific <- reactiveVal(sort(unique(x_axis_table[[x_axis_specific_column]])))
       
+      observeEvent(input$x_axis_specific_select, {
+        
+        # Compare current selection with the previous one
+        if (!identical(input$x_axis_specific_select, x_axis_specific())) {
+          
+          # Enable render plot button and reset click bubble info
+          shinyjs::enable("render_evidence_map")
+          col_vector(NULL)
+          
+        }
+      }
+      )
       
       # Reactive value to track the previous main category selection
       legend_group <- reactiveVal(sort(unique(legend_table[[legend_group_column]])))
@@ -2806,8 +2913,7 @@ evidence_map_Server <- function(id,
           
           # Enable render plot button and reset click bubble info
           shinyjs::enable("render_evidence_map")
-          click_bubble(NULL)
-          
+          col_vector(NULL)
           
           # Update the tracked value of the previous main category
           legend_group(input$legend_maincat_select)
@@ -2827,21 +2933,28 @@ evidence_map_Server <- function(id,
                             choices = sort(legend_distinct),
                             options = pickerOptions(noneSelectedText = "Please Select",
                                                     virtualScroll = 100,
-                                                    maxOptions = 5,
+                                                    maxOptions = 9,
                                                     actionsBox = TRUE,
                                                     size = 10
                             ))
         }
       })
       
-      # Every time the comparison switch is turned on the legend_group is reset
-      observeEvent(input$comparison_switch, {
+      # Reactive value to track the previous main category selection
+      legend_specific <- reactiveVal(sort(unique(legend_table[[legend_specific_column]])))
+      
+      observeEvent(input$legend_specific_select, {
         
-        if (input$comparison_switch) {
+        # Compare current selection with the previous one
+        if (!identical(input$legened_specific_select, legend_specific())) {
           
-          legend_group(sort(unique(legend_table[[legend_group_column]])))
-        } 
-      })
+          # Enable render plot button and reset click bubble info
+          shinyjs::enable("render_evidence_map")
+          col_vector(NULL)
+          
+        }
+      }
+      )
       
       
       # Reset button logic
@@ -2857,11 +2970,8 @@ evidence_map_Server <- function(id,
         
         # enable render button, set render plot flag to FALSE & click info to NULL
         shinyjs::enable("render_evidence_map")
-        render_plot(FALSE)                       
-        
-        
-        #output$evidence_map_plot <- renderPlotly(NULL)
-        click_bubble(NULL)
+        render_plot(FALSE)
+        col_vector(NULL)
         
       })
       
@@ -2917,20 +3027,67 @@ evidence_map_Server <- function(id,
       })
       
       
-      # Create a reactive value for click info so we can reset
-      click_bubble <- reactiveVal(NULL) 
       
-      # Reactive consumer for click data
-      click_data <- reactive({
+      # click_bubble <- reactiveVal(NULL)
+      col_vector <- reactiveVal(NULL)
+      
+      observeEvent(event_data("plotly_click", source = "B"), {
         
-        click <- event_data("plotly_click", priority = "event", source = "B")
+        click <- event_data("plotly_click", source = "B")
         
-        click_bubble(click)
+        # Toggle logic for col_vector
+        data <- bubble_react()
+        keys <- data$key
         
+        selected_keys <- click$customdata
         
-        return(click)
+        current_state <- col_vector()
+        
+        # Initialize named logical vector if needed
+        if (is.null(current_state)) {
+          current_state <- setNames(rep(FALSE, length(keys)), keys)
+        }
+        
+        # Ensure selected_keys are in the current state
+        missing_keys <- setdiff(selected_keys, names(current_state))
+        if (length(missing_keys) > 0) {
+          current_state[missing_keys] <- FALSE
+        }
+        
+        # Toggle selection
+        current_state[selected_keys] <- !current_state[selected_keys]
+        
+        # Save updated selection state
+        col_vector(current_state)
+        
       })
       
+      # Double-click observer to reset all selections
+      observeEvent(event_data("plotly_doubleclick", source = "B"), {
+        
+        col_vector(NULL)
+        
+      })
+      
+      observeEvent(event_data("plotly_selected", source = "B"), {
+        
+        selection <- event_data("plotly_selected", source = "B")
+        req(selection)
+        
+        selected_keys <- selection$customdata
+        data <- bubble_react()
+        keys <- data$key
+        
+        current_state <- col_vector()
+        if (is.null(current_state)) {
+          current_state <- setNames(rep(FALSE, length(keys)), keys)
+        }
+        
+        # Set only selected ones to TRUE, others FALSE
+        current_state[selected_keys] <- TRUE
+        col_vector(current_state)
+        
+      })
       
       
       # Collect data for the plot, including click data
@@ -2970,56 +3127,33 @@ evidence_map_Server <- function(id,
         }
         
         data$key <- row.names(data)
-        data$col <- "#266080"
         
-        click_data <- click_data()
+        # Default: no selection
+        data$selected_bubble <- FALSE
         
-        # If click_bubble contains click info then add it to the data
-        if (!is.null(click_bubble())) {
-          
-          bubble_react_new <- data %>%
-            mutate(selected_colour = key %in% click_data$customdata)
-          
-          bubble_react_new$selected_colour <- data$key %in% click_data$customdata
-          
-          if (exists("col_vector")){
-            
-            bubble_react_new$col <- col_vector
-          }
-          
-          selected_row <- which(rownames(bubble_react_new) %in% click_data$customdata)
-          
-          if (!bubble_react_new$col[selected_row] == "#47B1A3"){
-            
-            bubble_react_new$col[selected_row] <- "#47B1A3"
-            
-            assign("col_vector", bubble_react_new$col, envir = .GlobalEnv)
-            
-          } else{
-            
-            bubble_react_new$col[selected_row] <- "#266080"
-            
-            assign("col_vector", bubble_react_new$col, envir = .GlobalEnv)
-            
-          }
-          
-          
+        current_state <- col_vector()
+        if (!is.null(current_state)) {
+          matched <- match(data$key, names(current_state))
+          data$selected_bubble <- current_state[matched]
         }
         
-        # If there is no click data then continue
-        else {
-          
-          data$col <- "#266080"
-          
-          bubble_react_new <- data %>%
-            mutate(selected_colour = FALSE)
-          
-          assign("col_vector", bubble_react_new$col, envir = .GlobalEnv)
-          
-        }
         
-        return(bubble_react_new)
+        return(data)
         
+        
+      })
+      
+      # Error handling for no plot shown
+      plot_data <- reactive({
+        
+        tryCatch({
+          
+          bubble_react()
+          
+        }, error = function(e) {
+          
+          NULL
+        })
       })
       
       # Evidence map - table react ----
@@ -3030,9 +3164,9 @@ evidence_map_Server <- function(id,
           
           bubble_data <- bubble_react()
           
-          if ("selected_colour" %in% names(bubble_data)) {
+          if ("selected_bubble" %in% names(bubble_data)) {
             table_filter <- bubble_data %>%
-              filter(selected_colour == TRUE)
+              filter(selected_bubble == TRUE)
             
           } else {
             
@@ -3042,12 +3176,14 @@ evidence_map_Server <- function(id,
           
           # Use the click data to filter the data
           final_table <- data_table() %>%
-            filter(.data[[y_type()]] %in% table_filter[[y_type()]],
-                   .data[[x_type()]] %in% table_filter[[x_type()]],
-                   .data[[legend_type()]] %in% table_filter[[legend_type()]])
+            semi_join(
+              table_filter,
+              by = c(y_type(), x_type(), legend_type())
+            )
+          
           
           # Add metadata to this
-          final_table <- pico %>%
+          final_table <- pico_data %>%
             filter(uid %in% final_table$uid) %>%
             left_join(citations_metadata, by = "uid") %>%
             select(uid, year, author, title, .data[[y_type()]], .data[[x_type()]], .data[[legend_type()]], doi, url) %>%
@@ -3079,9 +3215,9 @@ evidence_map_Server <- function(id,
           
           bubble_data <- bubble_react()
           
-          if ("selected_colour" %in% names(bubble_data)) {
+          if ("selected_bubble" %in% names(bubble_data)) {
             table_filter <- bubble_data %>%
-              filter(selected_colour == TRUE)
+              filter(selected_bubble == TRUE)
             
           } else {
             
@@ -3089,13 +3225,15 @@ evidence_map_Server <- function(id,
             
           }
           
+          
           # Use the click data to filter the data
           final_table <- data_table() %>%
-            filter(.data[[y_type()]] %in% table_filter[[y_type()]],
-                   .data[[x_type()]] %in% table_filter[[x_type()]])
+            semi_join(table_filter, 
+                      by = c(y_type(), x_type()))
+          
           
           # Add metadata to this
-          final_table <- pico %>%
+          final_table <- pico_data %>%
             filter(uid %in% final_table$uid) %>%
             left_join(citations_metadata, by = "uid") %>%
             select(uid, year, author, title, .data[[y_type()]], .data[[x_type()]], doi, url) %>%
@@ -3124,31 +3262,17 @@ evidence_map_Server <- function(id,
         return(final_table)
       })
       
-      # Error handling for no plot shown
-      plot_data <- reactive({
-        
-        tryCatch({
-          
-          bubble_react()
-          
-        }, error = function(e) {
-          
-          NULL
-        })
-      })
       
-      # Message to show when no plot is shown
       output$error_message <- renderText({
-        
         if (is.null(plot_data()) | render_plot() == "FALSE") {
-          
-          "Please make selections and click 'Render Plot' to view!<br><br>Click on a bubble to see the corresponding studies."
-          
+          "Please make your selections and click <strong>'Render Plot'</strong> to begin exploring the evidence map. 
+    <br><br>For detailed guidance, click the <strong>Info</strong> button <i class='fa fa-info-circle fa-lg text-info' aria-hidden='true'></i>"
         } else {
-          
           ""
         }
       })
+      
+      
       
       # Reactive value for when there should be a plot shown
       render_plot <- reactiveVal(FALSE)
@@ -3156,7 +3280,6 @@ evidence_map_Server <- function(id,
       # Evidence map - plot -----
       observeEvent(input$render_evidence_map, {
         
-        shinyjs::disable("render_evidence_map")
         render_plot(TRUE)
         
         output$evidence_map_plot <- renderPlotly({
@@ -3187,7 +3310,7 @@ evidence_map_Server <- function(id,
                   jitter_base = ifelse(subcat_count > 1, 0.4 / (subcat_count - 1), 0),
                   jittered_x = numeric_x + (index - (subcat_count + 1) / 2) * jitter_base) %>%
                 ungroup() %>%
-                mutate(shape = ifelse(selected_colour == TRUE, "circle-cross-open", "circle")) 
+                mutate(shape = ifelse(selected_bubble == TRUE, "circle-cross-open", "circle")) 
               
               # Calculate midpoints for line positions
               unique_x_points <- sort(unique(plot$numeric_x))
@@ -3197,24 +3320,25 @@ evidence_map_Server <- function(id,
               max_n <- max(plot$n, na.rm = TRUE)
               sizeref_value <- 1 * (max_n/100)
               
+              muted_pal <- khroma::colour("muted")
+              muted_colors <- muted_pal(9)
               
-              # Assign colours to legend and map
-              legend_colours <- c(
-                dark_blue = "#1A465F",
-                dot_text_green = "#64C296",
-                coral = "#FF7F50",
-                gold = "#FFD700",
-                rose_quartz = "#A799B7",
-                indian_red = "#D05353",
-                slate_grey = "#708090",
-                melon = "#DAA49A",
-                coyote = "#735F3D",
-                lavender = "#E6E6FA"
+              legend_colours <- setNames(
+                muted_colors,
+                c("dark_blue", "dot_text_green", "coral", "gold", "rose_quartz",
+                  "indian_red", "slate_grey", "melon", "coyote")
               )
               
               
-              unique_color_var <- unique(input$legend_specific_select)
-              color_map <- setNames(legend_colours[1:length(unique_color_var)], unique_color_var)
+              
+              # Get the currently available legend categories from data & selection
+              available_colors <- plot %>%
+                filter(.data[[legend_type()]] %in% input$legend_specific_select) %>%
+                distinct(.data[[legend_type()]]) %>%
+                pull()
+              
+              # unique_color_var <- unique(input$legend_specific_select)
+              color_map <- setNames(legend_colours[1:length(available_colors)], available_colors)
               
               # Create plot for comparison switch == TRUE
               p <- plot_ly(plot,
@@ -3225,7 +3349,7 @@ evidence_map_Server <- function(id,
                            type = 'scatter',
                            mode = 'markers',
                            source = "B",
-                           height = 750,
+                           height = 800,
                            fill = ~'',
                            marker = list(symbol = ~shape, sizemode = 'area',
                                          opacity = 0.8, sizeref = sizeref_value,
@@ -3239,20 +3363,25 @@ evidence_map_Server <- function(id,
                              "<br><b>", toTitleCase(legend_type()), ":</b>", .data[[legend_type()]],
                              "<br><b>Number of Publications:</b> ", n
                            )) %>%
-                layout(yaxis = list(title = list(text = toTitleCase(y_type()), standoff = 25),
-                                    showgrid = TRUE
+                layout(yaxis = list(title = list(text = paste0("<b>", toTitleCase(y_type()), "</b>"),
+                                                 standoff = 25),
+                                    showgrid = TRUE,
+                                    color = "black"
+                                    
                 ),
                 xaxis = list(
-                  title = list(text = "", standoff = 25),
+                  title = list(text = paste0("<b>", toTitleCase(x_type()), "</b>"), standoff = 20),
                   ticklen = 4,
                   tickvals = unique(plot$numeric_x),
                   ticktext = unique(plot[[x_type()]]),
                   showgrid = FALSE,
                   tickfont = list(
-                    size = 14,  # Increase the font size as desired
+                    size = 14,
                     color = "black",
-                    family = "Arial, bold"  # Specify bold here
-                  )
+                    family = "Arial"
+                  ),
+                  range = c(min(unique(plot$numeric_x)) - 0.5, max(unique(plot$numeric_x)) + 0.5)
+                  
                 ),
                 hoverlabel = list(bgcolor = "white",
                                   font = list(size = 14)),
@@ -3275,6 +3404,8 @@ evidence_map_Server <- function(id,
                   })
                 
                 )
+              
+              
               return(p)
             }, error = function(e) {
               
@@ -3286,11 +3417,10 @@ evidence_map_Server <- function(id,
             
             tryCatch({
               
-              
               plot <- data %>%
                 ungroup() %>%
                 mutate(numeric_x = as.numeric(factor(.data[[x_type()]]))) %>%
-                mutate(shape = ifelse(selected_colour == TRUE, "circle-cross-open", "circle")) 
+                mutate(shape = ifelse(selected_bubble == TRUE, "circle-cross-open", "circle"))
               
               # Calculate midpoints for line positions
               unique_x_points <- sort(unique(plot$numeric_x))
@@ -3305,7 +3435,7 @@ evidence_map_Server <- function(id,
                            type = 'scatter',
                            mode = 'markers',
                            source = "B",
-                           height = 750,
+                           height = 800,
                            fill = ~'',
                            marker = list(symbol = ~shape, sizemode = 'area',
                                          opacity = 0.8, sizeref = sizeref_value,
@@ -3318,36 +3448,45 @@ evidence_map_Server <- function(id,
                              "<br><b>", toTitleCase(x_type()), ":</b> ", .data[[x_type()]],
                              "<br><b>Number of Publications:</b> ", n
                            )) %>%
-                layout(yaxis = list(title = list(text = toTitleCase(y_type()), standoff = 25),
-                                    showgrid = TRUE
-                ),
-                xaxis = list(
-                  title = list(text = "", standoff = 25),
-                  ticklen = 4,
-                  tickvals = unique(plot$numeric_x),
-                  ticktext = unique(plot[[x_type()]]),
-                  showgrid = FALSE,
-                  tickfont = list(
-                    size = 14,  # Increase the font size as desired
-                    color = "black",
-                    family = "Arial, bold"  # Specify bold here
-                  )
-                ),
-                hoverlabel = list(bgcolor = "white",
-                                  font = list(size = 14)),
-                clickmode = "event + select",
-                shapes =
-                  lapply(line_positions, function(pos) {
-                    list(
-                      type = "line",
-                      x0 = pos, y0 = 0,
-                      x1 = pos, y1 = 1,
-                      xref = 'x', yref = 'paper',  # Vertical lines along x
-                      line = list(color = 'grey', width = 1)
-                    )
-                  })
-                
-                ) 
+                layout(
+                  yaxis = list(
+                    title = list(
+                      text = paste0("<b>", toTitleCase(y_type()), "</b>"),
+                      standoff = 25),
+                    showgrid = TRUE,
+                    color = "black"
+                    
+                  ),
+                  xaxis = list(
+                    title = list(text = paste0("<b>", toTitleCase(x_type()), "</b>") , standoff = 20),
+                    ticklen = 4,
+                    tickvals = unique(plot$numeric_x),
+                    ticktext = unique(plot[[x_type()]]),
+                    showgrid = FALSE,
+                    tickfont = list(
+                      size = 14,
+                      color = "black",
+                      family = "Arial"
+                    ),
+                    range = c(min(unique(plot$numeric_x)) - 0.5, max(unique(plot$numeric_x)) + 0.5)
+                    
+                  ),
+                  hoverlabel = list(bgcolor = "white",
+                                    font = list(size = 14)),
+                  clickmode = "event + select",
+                  shapes =
+                    lapply(line_positions, function(pos) {
+                      list(
+                        type = "line",
+                        x0 = pos, y0 = 0,
+                        x1 = pos, y1 = 1,
+                        xref = 'x', yref = 'paper',  # Vertical lines along x
+                        line = list(color = 'grey', width = 1)
+                      )
+                    })
+                  
+                )
+              
               return(p)
             }, error = function(e) {
               
@@ -3362,6 +3501,8 @@ evidence_map_Server <- function(id,
       
       # Evidence map - datatable -----
       output$evidence_map_datatable <- DT::renderDataTable({
+        
+        dl_evidence_map  <<- table_react()
         
         tryCatch({
           
@@ -3381,39 +3522,42 @@ evidence_map_Server <- function(id,
               scroller = TRUE,
               columnDefs = list(
                 list(
-                  targets = c(2), #target for JS code
-                  render = JS(
-                    "function(data, type, row, meta) {",
-                    "return type === 'display' && data.length > 100 ?",
-                    "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
-                    "}"
-                  )
+                  width = '5%', targets = 0
                 ),
                 list(
-                  targets = c(1, 2), #target for JS code
+                  targets = c(1),
                   render = JS(
                     "function(data, type, row, meta) {",
-                    "return type === 'display' && data.length > 15 ?",
-                    "'<span title=\"' + data + '\">' + data.substr(0, 15) + '...</span>' : data;",
+                    "return type === 'display' && data.length > 50 ?",
+                    "'<span title=\"' + data + '\">' + data.substr(0, 50) + '...</span>' : data;",
                     "}"
                   )
                 ),
-                list(width = '10%', targets = "_all")
+                # Applies to columns 3 and beyond, returns unchanged for targets 0,1 & 2
+                list(
+                  targets = "_all", 
+                  render = JS(
+                    "function(data, type, row, meta) {",
+                    "if (meta.col >= 3) {", 
+                    "  return type === 'display' && data && data.length > 200 ?",
+                    "    '<span title=\"' + data + '\">' + data.substr(0, 200) + '...</span>' : data;",
+                    "}",
+                    "return data;",
+                    "}"
+                  )
+                )
               )
             )
           )
         }, error = function(e) {
-          # showNotification(
-          #   "Please double-click the plot to reset.",
-          #   type = "error",
-          #   duration = 5
-          # )
           
           # Return an empty datatable to avoid further errors
           DT::datatable(data.frame(), rownames = FALSE)
         })
       })
       
+      download_table_Server("dl_evidence_map",
+                            table = dl_evidence_map, citations_for_dl = included_with_metadata)
     }
   )
 }
