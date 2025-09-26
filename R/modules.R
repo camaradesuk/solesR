@@ -355,6 +355,8 @@ pie_completion_Server <- function(id, table, identifier, included_studies, colou
           
         } else {
           
+          table$status <- "tagged" 
+          
           df_count <- included_studies %>%
             left_join(table, by=identifier, multiple="all") %>%
             mutate(tag_status = ifelse(is.na(status), "Incomplete", "Complete")) %>%
