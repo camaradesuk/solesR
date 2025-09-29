@@ -241,9 +241,11 @@ get_missing_dois <- function(citations){
   
   # Try to match based on other metadata
   try(correct_doi <- match %>%
-        tidyr::unnest(cols=author.y) %>%
+        select(title, authorships, pages, first_page, last_page, journal, source_display_name, uid, new_doi) %>%
+        tidyr::unnest(cols=authorships) %>%
         filter(author_position == "first") %>%
-        rename(author_orig = author.x,
+        rename(author_orig = author,
+               au_display_name = display_name,
                new_doi=doi.y) %>%
         select(title, au_display_name, author_orig, pages, first_page, last_page, journal, source_display_name, uid, new_doi) %>%
         unique()%>%
