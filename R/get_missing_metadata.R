@@ -245,7 +245,7 @@ get_missing_dois <- function(citations){
         filter(author_position == "first") %>%
         rename(author_orig = author.x,
                new_doi=doi.y) %>%
-        select(title, au_display_name, author_orig, pages, first_page, last_page, journal, so, uid, new_doi) %>%
+        select(title, au_display_name, author_orig, pages, first_page, last_page, journal, source_display_name, uid, new_doi) %>%
         unique()%>%
         filter(!is.na(new_doi)) %>%
         tidyr::unite(pages_new, first_page, last_page, sep = "-", na.rm=TRUE) %>%
@@ -254,7 +254,7 @@ get_missing_dois <- function(citations){
         mutate(author_orig =  substr(author_orig,1,18)) %>%
         mutate(auth_match = stringdist::stringsim(author_orig, au_display_name, method="qgram")) %>%
         mutate(auth_match = ifelse(auth_match > 0.5, "yes", "no")) %>%
-        mutate(jour_match = stringdist::stringsim(journal, so, method="qgram")) %>%
+        mutate(jour_match = stringdist::stringsim(journal, source_display_name, method="qgram")) %>%
         mutate(jour_match = ifelse(jour_match > 0.5, "yes", "no")) %>%
         mutate(final_match = ifelse(page_match== "yes" & auth_match == "yes", "match",  "check")) %>%
         mutate(final_match = ifelse(page_match== "yes" & jour_match == "yes", "match", paste(final_match))) %>%
