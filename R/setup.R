@@ -203,10 +203,10 @@ setup_soles <- function(con, folder, master_node){
   if (grepl("y", proceed)) {
     
     # retrieved citations
-    soles::check_if_retrieved(con, search_results) 
+    solesR::check_if_retrieved(con, search_results) 
     
     # deduplicate with asysd
-    all_unique <- suppressWarnings(soles::dedup_first_search(search_results))
+    all_unique <- suppressWarnings(solesR::dedup_first_search(search_results))
     all_unique <- all_unique$unique
     
     n_unique <- length(all_unique$uid)
