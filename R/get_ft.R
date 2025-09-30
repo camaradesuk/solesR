@@ -805,13 +805,13 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
   })
   
   # Filter list with PMCID
-  pmcid_id <- pmcid_id %>%
+  pmcid_id <- result_df %>%
     dplyr::filter(!is.na(pmcid))
   
   # Continue if pmcids are found
-  if(nrow(pmcid_list) > 0){
+  if(nrow(pmcid_id) > 0){
     tryCatch({
-      xml_result <- europepmc::epmc_ftxt(ext_id = pmcid_id)
+      xml_result <- europepmc::epmc_ftxt(ext_id = pmcid_id$pmcid)
       # Save as file if it exists
       xml2::write_xml(xml_result, paste0(ft_path, "/", ft_name, ".xml"))
       # Write summary
@@ -825,10 +825,10 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
       # Remove from environment
       rm(xml_result)
       # Print message
-      message("Downloaded XML file for pmcid:", pmcid, " / DOI: ", doi)
+      message("Downloaded XML file for pmcid:", pmcid_id$pmcid, " / DOI: ", doi)
     }, error = function(e) {
       # Print a message if there's an error
-      message("No XML for for pmcid:", pmcid, " / DOI: ", doi)
+      message("No XML for for pmcid:", pmcid_id$pmcid, " / DOI: ", doi)
       # Generate summary
       ft_summary <- data.frame(
         doi = doi,
