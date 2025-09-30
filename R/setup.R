@@ -127,9 +127,9 @@ read_search <- function(file) {
     cat(filename, "input type not currently supported")
   
   # read search file
-  dat <- soles::manual_upload(file, source = source)
+  dat <- solesR::manual_upload(file, source = source)
   
-  try(dat <- soles::manual_upload(file, source = source), silent = TRUE)
+  try(dat <- solesR::manual_upload(file, source = source), silent = TRUE)
   
   # add column with date in folder name
   search_date <- stringr::str_extract(filename,  "(0[1-9]|[12][0-9]|3)(0[1-9]|1[0-2])\\d{2}(?!\\d)")
