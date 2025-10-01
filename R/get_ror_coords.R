@@ -76,15 +76,10 @@ get_ror_coords <- function(con){
     ror_json <- jsonlite::fromJSON(ror_data)
     
     # If data retrieved
-    if (!is.null(ror_json$addresses)) {
+    if (!is.null(ror_json$locations)) {
       # Extract lng and lat
-      institutions$latitude[i] <- ror_json$addresses$lat
-      institutions$longitude[i] <- ror_json$addresses$lng
-    }
-    # If not, store NA
-    else {
-      institutions$latitude[i] <- NA
-      institutions$longitude[i] <- NA
+      institutions$latitude[i] <- ror_json$locations$geonames_details$lat
+      institutions$longitude[i] <- ror_json$locations$geonames_details$lng
     }
     
   }
