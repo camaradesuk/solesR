@@ -498,7 +498,7 @@ run_k_fold <- function(con,
   evaluate_fold <- function(df) {
     thresholds <- seq(0, 1, by = 0.01)
     
-    perf_df <- map_dfr(thresholds, function(thresh) {
+    perf_df <- purrr::map_dfr(thresholds, function(thresh) {
       
       df_thresh <- df %>%
         mutate(pred = ifelse(score >= thresh, 1, 0))
