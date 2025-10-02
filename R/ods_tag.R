@@ -48,13 +48,20 @@ ods_tag <- function(con, path){
   }
   
   # Run tokenisation
-  PDF_text_sentences <- purrr::map(to_find$path, readr::read_lines) %>% 
-    purrr::map(paste, collapse = " ") %>% 
-    purrr::map(stringi::stri_enc_toutf8, validate = TRUE) %>% 
-    purrr::map(tokenizers::tokenize_sentences, simplify = TRUE) %>% 
-    purrr::map(tolower) %>% 
-    purrr::map(stringr::str_replace_all, pattern = ",", replacement = "") %>% 
-    purrr::map(.correct_tokenization)
+  PDF_text_sentences <- purrr::map(to_find$path, function(path) {
+    tryCatch({
+      readr::read_lines(path) %>%
+        paste(collapse = " ") %>%
+        stringi::stri_enc_toutf8(validate = TRUE) %>%
+        tokenizers::tokenize_sentences(simplify = TRUE) %>%
+        tolower() %>%
+        stringr::str_replace_all(pattern = ",", replacement = "") %>%
+        .correct_tokenization()
+    }, error = function(e) {
+      warning(paste("Failed to process:", path))
+      return(NULL)
+    })
+  })
   
   # Get names
   names(PDF_text_sentences) <- to_find$doi
