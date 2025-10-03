@@ -180,14 +180,14 @@ get_missing_dois <- function(citations){
   
   # Subset rows where DOI is missing and title is non-specific or short
   citations_no_doi <- citations  %>%
-    # Remove no DOI
-    filter(is.na(doi)|doi=="") %>%
-    # Remove no title
-    filter(!is.na(title)) %>%
     # Remove non-specific titles
     filter(!title %in% c("Preface", "Foreword")) %>%
     # Remove short titles
-    filter(stringr::str_length(citations$title) >= 25)
+    filter(stringr::str_length(citations$title) >= 25) %>%
+    # Remove no DOI
+    filter(is.na(doi)|doi=="") %>%
+    # Remove no title
+    filter(!is.na(title)) 
   
   # Print number missing DOI
   message(length(citations_no_doi$uid), " records with no doi")
@@ -241,30 +241,39 @@ get_missing_dois <- function(citations){
   
   # Try to match based on other metadata
   try(correct_doi <- match %>%
-        select(title, authorships, pages, first_page, last_page, journal, source_display_name, uid, new_doi = doi.y) %>%
+        # Select relevant
+        select(title, author_orig = author, authorships, journal_orig = journal, journal_new = source_display_name, year_orig = year, year_new = publication_year, uid, doi_new = doi.y) %>%
+        # Get author info
         tidyr::unnest(cols=authorships) %>%
         filter(author_position == "first") %>%
-        rename(author_orig = author,
-               au_display_name = display_name) %>%
-        select(title, au_display_name, author_orig, pages, first_page, last_page, journal, source_display_name, uid, new_doi) %>%
+        rename(author_new = display_name) %>%
+        # Select relevant
+        select(title, author_orig, author_new, journal_orig, journal_new, year_orig, year_new, uid, doi_new) %>%
         unique()%>%
-        filter(!is.na(new_doi)) %>%
-        tidyr::unite(pages_new, first_page, last_page, sep = "-", na.rm=TRUE) %>%
-        mutate(page_match = ifelse(pages == pages_new, "yes", "no")) %>%
-        mutate(au_display_name = as.character(au_display_name)) %>%
+        # Get with DOI
+        filter(!is.na(doi_new)) %>%
+        # Check for year match
+        mutate(year_match = ifelse(year_orig == year_new, "yes", "no")) %>%
+        # Check for author match
+        mutate(author_new = as.character(author_new)) %>%
         mutate(author_orig =  substr(author_orig,1,18)) %>%
-        mutate(auth_match = stringdist::stringsim(author_orig, au_display_name, method="qgram")) %>%
+        mutate(auth_match = stringdist::stringsim(author_orig, author_new, method="qgram")) %>%
         mutate(auth_match = ifelse(auth_match > 0.5, "yes", "no")) %>%
-        mutate(jour_match = stringdist::stringsim(journal, source_display_name, method="qgram")) %>%
+        # Check for journal match
+        mutate(jour_match = stringdist::stringsim(journal_orig, journal_new, method="qgram")) %>%
         mutate(jour_match = ifelse(jour_match > 0.5, "yes", "no")) %>%
-        mutate(final_match = ifelse(page_match== "yes" & auth_match == "yes", "match",  "check")) %>%
-        mutate(final_match = ifelse(page_match== "yes" & jour_match == "yes", "match", paste(final_match))) %>%
-        mutate(final_match = ifelse(auth_match == "no" & jour_match == "no" & page_match == "no", "not_match", paste(final_match))) %>%
+        # Check for two out of three match
+        mutate(final_match = ifelse(year_match== "yes" & auth_match == "yes", "match",  "check")) %>%
+        mutate(final_match = ifelse(year_match== "yes" & jour_match == "yes", "match", paste(final_match))) %>%
+        mutate(final_match = ifelse(auth_match == "no" & jour_match == "no" & year_match == "no", "not_match", paste(final_match))) %>%
         filter(final_match == "match") %>%
-        select(uid, new_doi) %>%
-        rename(doi = new_doi) %>%
+        select(uid, doi_new) %>%
+        rename(doi = doi_new) %>%
         # Remove any additional DOIs (e.g, elife versioning)
-        mutate(doi = gsub("; .+$", "", doi)), silent=TRUE)
+        mutate(doi = gsub("; .+$", "", doi)) %>%
+        group_by(uid) %>%
+        slice_head()
+      , silent=TRUE)
   
   # Pint message
   if(!exists("correct_doi")){
