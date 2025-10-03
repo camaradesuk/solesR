@@ -764,7 +764,7 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
   
   # Check DOI is character
   if(is.character(doi) == FALSE ){
-    stop(message("doi and elsevier_token should all be character strings"))
+    stop("doi and elsevier_token should all be character strings")
   }
   
   # Check ft_path exists
@@ -790,7 +790,7 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
     # Query crossref
     result <- rcrossref::id_converter(doi)
     # get data
-    result_df <- result$records
+    pmcid_id <- result$records
     
     if ("status" %in% colnames(result_df)) {
       # Error status, create placeholder
@@ -805,7 +805,7 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
   })
   
   # Filter list with PMCID
-  pmcid_id <- result_df %>%
+  pmcid_id <- pmcid_id %>%
     dplyr::filter(!is.na(pmcid))
   
   # Continue if pmcids are found
@@ -840,7 +840,7 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
       )
     })
   } else{
-    message(message("No PMCID for DOI: ", doi))
+    message("No PMCID for DOI: ", doi)
     # Generate summary
     ft_summary <- data.frame(
       doi = doi,
@@ -851,6 +851,9 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
       date = Sys.Date()
     )
   }
+  
+  # Return summary
+  return(ft_summary)
 }
 
 
