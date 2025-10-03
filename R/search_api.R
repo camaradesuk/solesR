@@ -83,7 +83,7 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
   min_date_char <- min_date_char - 1
   
   # Append timespan to user query to define final query
-  full_query <- paste0("(", query, ") AND LOAD-DATE > ", min_date_char)
+  full_query <- paste0("(", query, ") AND ORIG-LOAD-DATE > ", min_date_char)
 
   # Print message
   message("Running Scopus search...")
@@ -373,7 +373,7 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   message("Running PubMed search...")
   
   # Add dates to query
-  full_query <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Modification]")
+  full_query <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Create]")
 
   # Get summary of NCBI EUtils query
   pubmed_search <- RISmed::EUtilsSummary(
