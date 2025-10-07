@@ -2496,7 +2496,8 @@ evidence_map_UI <- function(id,
 #' and generate a plotly evidence map.
 #'
 #' @param id The module identifier. Used to namespace the module's UI and server components.
-#' @param citations_metadata A data table containing metadata for citations.65
+#' @param citations_metadata A data table containing metadata for citations.
+#' @param pico_data A data frame containing the combined pico tagging information, taken from the workflow.
 #' @param x_axis_table A data frame containing data related to the x-axis of the evidence map.
 #' @param y_axis_table A data frame containing data related to the y-axis of the evidence map.
 #' @param legend_table A data frame containing data for the legend categories.
