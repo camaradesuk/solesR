@@ -28,7 +28,9 @@ evidence_map_Server(
 \arguments{
 \item{id}{The module identifier. Used to namespace the module's UI and server components.}
 
-\item{citations_metadata}{A data table containing metadata for citations.65}
+\item{citations_metadata}{A data table containing metadata for citations.}
+
+\item{pico_data}{A data frame containing the combined pico tagging information, taken from the workflow.}
 
 \item{x_axis_table}{A data frame containing data related to the x-axis of the evidence map.}
 
