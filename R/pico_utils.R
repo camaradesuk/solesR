@@ -385,7 +385,7 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
     message("No new RegEx identified.")
   } else if(n_new < 1 &
             isFALSE(update)) {
-    message("No new RegEx identified. To make use of the most up-to-date pico dictionary, we recommend getting the latest version from OSF. See ?soles::check_pico()")
+    message("No new RegEx identified. To make use of the most up-to-date pico dictionary, we recommend getting the latest version from OSF. See ?solesR::check_pico()")
   } else if(n_new > 0) {
     # if new regexes are provided go through more checks and update OSF
 
