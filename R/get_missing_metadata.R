@@ -213,6 +213,9 @@ get_missing_dois <- function(citations){
       entity = "works",
       title.search = citations_no_doi$title[i]),silent=TRUE)
     
+    # Add pause between requests for API limits
+    Sys.sleep(time = 1)
+    
     # Bind results together
     if(is.data.frame(new)){
       # Print success message to console
