@@ -162,7 +162,7 @@ regex_tag <- function(con, tag_type, tag_method, tag_main_category = "all", retM
       dplyr::filter(filter(!uid %in% done_fulltext$uid)) %>%
       dplyr::select(uid, doi) %>%
       dplyr::left_join(dplyr::tbl(con, "full_texts"), by = "doi") %>%
-      dplyyr::select(uid, doi, ft_path_full, ft_ext)
+      dplyr::select(uid, doi, path, ft_ext)
     
     # Get sample to tag
     if(nrow(to_tag_fulltext) < 1){
@@ -176,8 +176,10 @@ regex_tag <- function(con, tag_type, tag_method, tag_main_category = "all", retM
     }
     
     # Subset xml full texts
+    # Currently works for epmc but not elseier xml
     to_tag_fulltext_xml <- to_tag_fulltext %>%
-      dplyr::filter(ft_ext == "xml")
+      dplyr::filter(ft_ext == "xml") %>%
+      dplyr::filter(method == "epmc")
     
     # Subset pdf full texts
     to_tag_fulltext_pdf <- to_tag_fulltext %>%
@@ -188,7 +190,7 @@ regex_tag <- function(con, tag_type, tag_method, tag_main_category = "all", retM
       # Create empty results object
       xml_texts <- NULL
       for (i in 1:nrow(to_tag_fulltext_xml)){
-        xml <- xml2::read_xml(to_tag_fulltext_xml$ft_path_full[i])
+        xml <- xml2::read_xml(to_tag_fulltext_xml$path[i])
         xml <- tidypmc::pmc_text(xml) %>%
           mutate(uid = to_tag_fulltext_xml$uid[i])
         xml_texts <- rbind(xml_texts, xml)
@@ -200,7 +202,7 @@ regex_tag <- function(con, tag_type, tag_method, tag_main_category = "all", retM
       # Create empty results object
       pdf_texts <- NULL
       for (i in 1:nrow(to_tag_fulltext_pdf)){
-        pdf <- readtext::readtext(to_tag_fulltext_pdf$ft_path_full[i]) %>% mutate(doc_id = to_tag_fulltext_pdf$uid[i])
+        pdf <- readtext::readtext(to_tag_fulltext_pdf$path[i]) %>% mutate(doc_id = to_tag_fulltext_pdf$uid[i])
         pdf_texts <- rbind(pdf_texts, pdf)
       }
     }
