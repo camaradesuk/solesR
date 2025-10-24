@@ -70,7 +70,8 @@ Imports:
     dbplyr,
     httr,
     jsonlite,
-    caret,
+    khroma,
+    shinyhelper,
     rsample,
     europepmc
 VignetteBuilder: knitr
