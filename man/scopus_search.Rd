@@ -8,7 +8,7 @@ scopus_search(
   query = NULL,
   api_key = NULL,
   timespan = NULL,
-  retMax = 2000,
+  retMax = 5000,
   format_soles = TRUE
 )
 }
@@ -19,7 +19,7 @@ scopus_search(
 
 \item{timespan}{a formatted character string defining the timespan you want to search}
 
-\item{retMax}{The maximum number of records to retrieve, default is 2000, maximum is 5000}
+\item{retMax}{The maximum number of records to retrieve, default is 5000, maximum is 5000}
 
 \item{format_soles}{boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE}
 }

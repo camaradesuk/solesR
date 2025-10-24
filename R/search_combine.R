@@ -38,7 +38,10 @@ combine_searches <- function(...) {
   combined <- plyr::rbind.fill(...)
 
   # Rename issue number
-  combined$number <- combined$issue
+  if ("issue" %in% colnames(combined)){
+    combined$number <- combined$issue
+  }
+  
 
   # Define relevant columns for SOLES
   x <- c(

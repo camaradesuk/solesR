@@ -10,7 +10,7 @@
 #' @param query a character string containing a correctly syntaxed Scopus search
 #' @param api_key a working Scopus API key
 #' @param timespan a formatted character string defining the timespan you want to search
-#' @param retMax The maximum number of records to retrieve, default is 2000, maximum is 5000
+#' @param retMax The maximum number of records to retrieve, default is 5000, maximum is 5000
 #' @param format_soles boolean, if set to TRUE will format search results for the SOLES workflow, default is TRUE
 #' @return a dataframe containing Scopus search results
 #' @examples
@@ -23,7 +23,7 @@
 #' @import scopusAPI
 #' @export
 #'
-scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax = 2000, format_soles = TRUE) {
+scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax = 5000, format_soles = TRUE) {
   # Check for query and exit if NULL
   if (is.null(query)) {
     stop(message("Error: you have not entered a search query"))
