@@ -99,10 +99,12 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
   
   # If full_texts table exists, read it in
   if (dbExistsTable(con, "full_texts")){
-    ft_found <- DBI::dbReadTable(con, "full_texts")
+    ft_found <- DBI::dbReadTable(con, "full_texts") %>%
+      dplyr::filter(status == "found")
     if(isTRUE(check_failed)){
       ft_found <- ft_found %>%
-        dplyr::filter(date > retrieval_date)
+        dplyr::filter(date > retrieval_date) %>%
+        dplyr:filter(status == "found")
     }
   } else{
     # Create empty dataframe
@@ -119,7 +121,7 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
     dplyr::distinct() %>%
     collect()
   
-  # Filter ot found
+  # Filter not found
   dois <- dois %>%
     dplyr::filter(!doi %in% ft_found$doi)
   
@@ -158,7 +160,7 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
       # Remove not found from summary
       pdf_summary <- pdf_summary %>%
         # Remove where no file path, therefore no file
-        dplyr::filter(!is.na(ft_path_full))
+        dplyr::filter(!is.na(path))
       message(nrow(pdf_summary), " files found from unpaywall")
       # Remove from doi list where file found
       dois_pdf <- dois_pdf[!dois_pdf %in% pdf_summary$doi]
@@ -177,7 +179,7 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
       # Remove not found from summary
       pdf_summary <- pdf_summary %>%
         # Remove where no file path, therefore no file
-        dplyr::filter(!is.na(ft_path_full))
+        dplyr::filter(!is.na(path))
       message(nrow(pdf_summary), " files found from crossref")
       # Remove from doi list where file found
       dois_pdf <- dois_pdf[!dois_pdf %in% pdf_summary$doi]
@@ -196,7 +198,7 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
       # Remove not found from summary
       pdf_summary <- pdf_summary %>%
         # Remove where no file path, therefore no file
-        dplyr::filter(!is.na(ft_path_full))
+        dplyr::filter(!is.na(path))
       message(nrow(pdf_summary), " files found from wiley")
       # Remove from doi list where file found
       dois_pdf <- dois_pdf[!dois_pdf %in% pdf_summary$doi]
@@ -228,7 +230,7 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
       # Remove not found from summary
       xml_summary <- xml_summary %>%
         # Remove where no file path, therefore no file
-        dplyr::filter(!is.na(ft_path_full))
+        dplyr::filter(!is.na(path))
       message(nrow(xml_summary), " files found from epmc")
       # Remove from doi list where file found
       dois_xml <- dois_xml[!dois_xml %in% xml_summary$doi]
@@ -247,7 +249,7 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
       # Remove not found from summary
       xml_summary <- xml_summary %>%
         # Remove where no file path, therefore no file
-        dplyr::filter(!is.na(ft_path_full))
+        dplyr::filter(!is.na(path))
       message(nrow(xml_summary), " files found from elsevier")
       # Remove from doi list where file found
       dois_xml <- dois_xml[!dois_xml %in% xml_summary$doi]
@@ -267,11 +269,13 @@ get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_so
   # Summarise not found
   ft_summary_not_found <- dois %>%
     dplyr::filter(!doi %in% ft_summary_all$doi) %>%
-    dplyr::mutate(doi_encoded = URLencode(doi, reserved = TRUE),
+    dplyr::mutate(status = "failed",
+                  doi_encoded = URLencode(doi, reserved = TRUE),
                   method = NA,
-                  ft_path_full = NA,
+                  path = NA,
                   ft_ext = NA,
-                  date = Sys.Date())
+                  date = Sys.Date()) %>%
+    select(status, doi_encoded, doi, method, path, ft_ext, date)
   
   # Combine previously found, found now, and not found
   ft_summary_all <- rbind(ft_found, ft_summary_all, ft_summary_not_found)
@@ -338,7 +342,7 @@ ft_unpaywall <- function(doi, uid, unpaywall_email, ft_path, ft_name_style = "do
       tidyr::unnest(cols = c(best_oa_location))
     if(nrow(df) > 0){
       df <- df %>%
-        mutate(ft_path_full = paste0(ft_path, "/", ft_name, ".pdf")) %>%
+        mutate(path = paste0(ft_path, "/", ft_name, ".pdf")) %>%
         # Remove big publishers
         filter(!publisher %in% c("Wiley", "Elsevier BV", "SAGE Publications")) %>% 
         filter(!grepl("tandfonline",url)) %>%
@@ -357,7 +361,7 @@ ft_unpaywall <- function(doi, uid, unpaywall_email, ft_path, ft_name_style = "do
       if(nrow(df) > 0) {
         # Extract PDF URL and file destination
         upw_urls <- df$url_for_pdf
-        upw_dest <- df$ft_path_full
+        upw_dest <- df$path
         
         # Download PDFs using CrossRef URL
         for (i in 1:length(upw_urls)) {
@@ -395,8 +399,8 @@ ft_unpaywall <- function(doi, uid, unpaywall_email, ft_path, ft_name_style = "do
       message(sprintf("Not found unpaywall PDF for DOI '%s'", doi))
     }
     # Keep only files that actually exist (after download)
-    if ("ft_path_full" %in% names(df)){
-      df_valid <- df[file.exists(df$ft_path_full), ]
+    if ("path" %in% names(df)){
+      df_valid <- df[file.exists(df$path), ]
     } else{
       df_valid <- data.frame()
     }
@@ -404,20 +408,22 @@ ft_unpaywall <- function(doi, uid, unpaywall_email, ft_path, ft_name_style = "do
     # If at least one file was successfully downloaded
     if (nrow(df_valid) > 0) {
       ft_summary <- data.frame(
+        status = "found",
         doi = doi,
         doi_encoded = doi_encoded,
         method = "unpaywall",
-        ft_path_full = df_valid$ft_path_full[1],
-        ft_ext = tools::file_ext(df_valid$ft_path_full[1]),
+        path = df_valid$path[1],
+        ft_ext = tools::file_ext(df_valid$path[1]),
         date = Sys.Date()
       )
     } else {
       # No valid files downloaded
       ft_summary <- data.frame(
+        status = "failed",
         doi = doi,
         doi_encoded = doi_encoded,
         method = "unpaywall",
-        ft_path_full = NA,
+        path = NA,
         ft_ext = NA,
         date = Sys.Date()
       )
@@ -427,10 +433,11 @@ ft_unpaywall <- function(doi, uid, unpaywall_email, ft_path, ft_name_style = "do
     message(sprintf("Not found unpaywall PDF for DOI '%s'", doi))
     # Generate summary
     ft_summary <- data.frame(
+      status = "failed",
       doi = doi,
       doi_encoded = doi_encoded,
       method = "unpaywall",
-      ft_path_full = NA,
+      path = NA,
       ft_ext = NA,
       date = Sys.Date()
     )
@@ -494,9 +501,9 @@ ft_crossref <- function(doi, uid, ft_path, ft_name_style = "doi"){
       dplyr::mutate(content.type = ifelse(content.type == "unspecified" & grepl("pdf", URL), "pdf", content.type)) %>%
       dplyr::filter(grepl("pdf", content.type)) %>%
       dplyr::mutate(
-        ft_path_full = paste0(ft_path, "/", ft_name, ".pdf")
+        path = paste0(ft_path, "/", ft_name, ".pdf")
       ) %>%
-      dplyr::select(name, URL, content.type, ft_path_full) %>%
+      dplyr::select(name, URL, content.type, path) %>%
       dplyr::distinct()
     
     # filter out big publishers (typically give warnings)
@@ -511,7 +518,7 @@ ft_crossref <- function(doi, uid, ft_path, ft_name_style = "doi"){
     if(nrow(df) > 0){
       # Extract PDF URL and file destination
       cr_urls <- df$URL
-      cr_dest <- df$ft_path_full
+      cr_dest <- df$path
       
       # Download PDFs using CrossRef URL
       for (i in 1:length(cr_urls)) {
@@ -546,25 +553,28 @@ ft_crossref <- function(doi, uid, ft_path, ft_name_style = "doi"){
       message(sprintf("Not found crossRef PDF for DOI '%s'", doi))
     }
     # Keep only files that actually exist (after download)
-    df_valid <- df[file.exists(df$ft_path_full), ]
+    df_valid <- df[file.exists(df$path), ]
     
     # If at least one file was successfully downloaded
     if (nrow(df_valid) > 0) {
       ft_summary <- data.frame(
+        status = "found",
         doi = doi,
         doi_encoded = doi_encoded,
-        method = "crossRef",
-        ft_path_full = df_valid$ft_path_full[1],
-        ft_ext = tools::file_ext(df_valid$ft_path_full[1]),
+        method = "crossref",
+        path = df_valid$path[1],
+        ft_ext = tools::file_ext(df_valid$path[1]),
         date = Sys.Date()
       )
     } else {
       # No valid files downloaded
       ft_summary <- data.frame(
+        
+        status = "failed",
         doi = doi,
         doi_encoded = doi_encoded,
-        method = "crossRef",
-        ft_path_full = NA,
+        method = "crossref",
+        path = NA,
         ft_ext = NA,
         date = Sys.Date()
       )
@@ -574,10 +584,11 @@ ft_crossref <- function(doi, uid, ft_path, ft_name_style = "doi"){
     message(sprintf("Not found crossRef PDF for DOI '%s'", doi))
     # Generate summary
     ft_summary <- data.frame(
+      status = "failed",
       doi = doi,
       doi_encoded = doi_encoded,
-      method = "crossRef",
-      ft_path_full = NA,
+      method = "crossref",
+      path = NA,
       ft_ext = NA,
       date = Sys.Date()
     )
@@ -641,10 +652,11 @@ ft_wiley <- function(doi, uid, wiley_token, ft_path, ft_name_style = "doi"){
     message(sprintf("Found wiley PDF for DOI '%s'", doi))
     # Generate summary data frme
     ft_summary <- data.frame(
+      status = "found",
       doi = doi,
       doi_encoded = doi_encoded,
       method = "wiley",
-      ft_path_full = paste0(ft_path, "/", ft_name, ".pdf"),
+      path = paste0(ft_path, "/", ft_name, ".pdf"),
       ft_ext = "pdf",
       date = Sys.Date()
     )
@@ -653,10 +665,11 @@ ft_wiley <- function(doi, uid, wiley_token, ft_path, ft_name_style = "doi"){
     message(sprintf("No wiley PDF found for DOI '%s'", doi))
     # Generate summary
     ft_summary <- data.frame(
+      status = "failed",
       doi = doi,
       doi_encoded = doi_encoded,
       method = "wiley",
-      ft_path_full = NA,
+      path = NA,
       ft_ext = NA,
       date = Sys.Date()
     )
@@ -720,10 +733,11 @@ ft_elsevier <- function(doi, uid, elsevier_token, ft_path, ft_name_style = "doi"
     message(sprintf("Found elsevier XML for DOI '%s'", doi))
     # Generate summary data frme
     ft_summary <- data.frame(
+      status = "found",
       doi = doi,
       doi_encoded = doi_encoded,
       method = "elsevier",
-      ft_path_full = paste0(ft_path, "/", ft_name, ".xml"),
+      path = paste0(ft_path, "/", ft_name, ".xml"),
       ft_ext = "xml", date = Sys.Date()
     )
   } else{
@@ -731,10 +745,11 @@ ft_elsevier <- function(doi, uid, elsevier_token, ft_path, ft_name_style = "doi"
     message(sprintf("No elsevier XML found for DOI '%s'", doi))
     # Generate summary
     ft_summary <- data.frame(
+      status = "failed",
       doi = doi,
       doi_encoded = doi_encoded,
       method = "elsevier",
-      ft_path_full = NA,
+      path = NA,
       ft_ext = NA,
       date = Sys.Date()
     )
@@ -819,7 +834,7 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
         doi = doi,
         doi_encoded = doi_encoded,
         method = "epmc",
-        ft_path_full = paste0(ft_path, "/", ft_name, ".xml"),
+        path = paste0(ft_path, "/", ft_name, ".xml"),
         ft_ext = "xml", date = Sys.Date()
       )
       # Remove from environment
@@ -831,10 +846,11 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
       message("No XML for for pmcid:", pmcid_id$pmcid, " / DOI: ", doi)
       # Generate summary
       ft_summary <- data.frame(
+        status = "found",
         doi = doi,
         doi_encoded = doi_encoded,
         method = "epmc",
-        ft_path_full = NA,
+        path = NA,
         ft_ext = NA,
         date = Sys.Date()
       )
@@ -843,10 +859,11 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
     message("No PMCID for DOI: ", doi)
     # Generate summary
     ft_summary <- data.frame(
+      status = "failed",
       doi = doi,
       doi_encoded = doi_encoded,
       method = "epmc",
-      ft_path_full = NA,
+      path = NA,
       ft_ext = NA,
       date = Sys.Date()
     )
@@ -855,5 +872,4 @@ ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
   # Return summary
   return(ft_summary)
 }
-
 
