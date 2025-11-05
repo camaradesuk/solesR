@@ -698,7 +698,7 @@ process_wos <- function(path){
     newdat <- bibliometrix::convert2df(path, dbsource = "wos", format="bibtex")
     
     # sort out naming
-    lookup_table <- setNames(field_codes_wos$Field, field_codes_wos$Abbreviation)
+    lookup_table <- setNames(ASySD::field_codes_wos$Field, ASySD::field_codes_wos$Abbreviation)
     colnames(newdat) <- lookup_table[colnames(newdat)]
     
     # remove columns that are blank
@@ -765,7 +765,20 @@ process_pubmed <- function(path){
   newdat <- newdat %>%
     mutate(uid = paste0("pubmed-", record_id)) %>%
     mutate(pmid = record_id) %>%
-    mutate(doi = ifelse(is.na(doi), stringr::str_extract(article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), doi))
+    mutate(
+      uid = paste0("pubmed-", record_id),
+      pmid = record_id,
+      doi = ifelse(
+        !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
+        stringr::str_extract(article_ids, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        doi
+      ),
+      doi = ifelse(
+        !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
+        stringr::str_extract(local_identifier, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        doi
+      )
+    )
   
   newdat <- format_doi(newdat)
   newdat <- format_cols(newdat)
