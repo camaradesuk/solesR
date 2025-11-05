@@ -632,6 +632,7 @@ process_medline <- function(path){
 #' \dontrun{
 #' # Example usage:
 #' wos_data <- process_wos("path/to/wos_data.bib")
+#' wos_data <- process_wos("path/to/wos_data.ris")
 #' }
 #'
 #' @importFrom bibliometrix convert2df
@@ -731,7 +732,7 @@ process_wos <- function(path){
 #' @return A processed data frame.
 #'
 #' @details
-#' This function reads references from the specified file in PubMed format using the "pubmed" database source. 
+#' This function reads references from the .nbib pubmed export (send to > citation manager > file.nbib) OR the PubMed text export (save > PubMed -> file.txt) You can access this by selecting "send to reference manager" for up to 10,000 records.  
 #' It adjusts column names according to the field codes, removes blank columns, adds source information, 
 #' creates a unique identifier (uid) based on the record_id, sets the data source to "pubmed", and 
 #' formats the doi column based on available information.
@@ -740,6 +741,7 @@ process_wos <- function(path){
 #' \dontrun{
 #' # Example usage:
 #' pubmed_data <- process_pubmed("path/to/pubmed_data.bib")
+#' pubmed_data <- process_pubmed("path/to/pubmed_data.txt")
 #' }
 #'
 #' @importFrom bibliometrix convert2df
@@ -795,7 +797,7 @@ process_pubmed <- function(path){
 #' @return A processed data frame.
 #'
 #' @details
-#' This function reads references from the specified file using the "ovid" tag naming convention. 
+#' This function reads references from the a CSV file exported from Scopus. 
 #' It performs various transformations on the data, such as uniting title and booktitle columns,
 #' formatting pages, creating a unique identifier (uid) based on the Scopus EID, and setting
 #' the data source to "scopus". Additionally, it prints the values of the article_id column.
