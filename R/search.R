@@ -699,7 +699,7 @@ process_wos <- function(path){
     newdat <- bibliometrix::convert2df(path, dbsource = "wos", format="bibtex")
     
     # sort out naming
-    lookup_table <- setNames(ASySD::field_codes_wos$Field, ASySD::field_codes_wos$Abbreviation)
+    lookup_table <- setNames(field_codes_wos$Field, field_codes_wos$Abbreviation)
     colnames(newdat) <- lookup_table[colnames(newdat)]
     
     # remove columns that are blank
