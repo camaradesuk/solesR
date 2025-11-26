@@ -9,7 +9,6 @@ search_Server(
   table,
   combined_pico_table,
   pico_data = list(),
-  citations_for_download,
   project_name = ""
 )
 }
@@ -21,8 +20,6 @@ search_Server(
 \item{combined_pico_table}{A combined dataframe of PICO tags.}
 
 \item{pico_data}{A list of dynamic search updates based on the PICO dropdown filters.}
-
-\item{citations_for_download}{A dataframe containing citations for download.}
 
 \item{project_name}{The name of the project.}
 }
