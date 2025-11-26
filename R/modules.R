@@ -1054,18 +1054,6 @@ search_UI <- function(id, table) {
                 no_outline = TRUE
               ),
               
-              br(),
-              p("Note for Rayyan export option below: download file and open in MS Excel first on your computer. Save as .csv in excel, then import saved file into Rayyan"),
-              downloadBttn(
-                ns("download_rayyan"),
-                label = "Download citations in Rayyan upload format",
-                style = "unite",
-                color = "primary",
-                size = "sm",
-                block = FALSE,
-                no_outline = TRUE
-              ),
-              
               style = "unite", icon = icon("download"),
               inline = TRUE,
               status = "success", width = "600px",
@@ -1098,7 +1086,6 @@ search_UI <- function(id, table) {
 #' @param table A dataframe of included studies with metadata.
 #' @param combined_pico_table A combined dataframe of PICO tags.
 #' @param pico_data A list of dynamic search updates based on the PICO dropdown filters.
-#' @param citations_for_download A dataframe containing citations for download.
 #' @param project_name The name of the project.
 #'
 #' @export
@@ -1106,7 +1093,6 @@ search_Server <- function(id,
                           table, 
                           combined_pico_table,
                           pico_data = list(),
-                          citations_for_download,
                           project_name = "") {
   moduleServer(
     id,
@@ -1702,7 +1688,7 @@ search_Server <- function(id,
       
       search_results_download <- reactive({
         
-        results <- citations_for_download %>%
+        results <- table %>%
           filter(uid %in% !!filter_results()$uid) %>% 
           mutate(abstract = "")
         
@@ -1710,11 +1696,10 @@ search_Server <- function(id,
       
       search_results_download_syrf <- reactive({
         
-        # tbl(con, "unique_citations"), filter, collect
-        results <- citations_for_download %>%
+        results <- table %>%
           filter(uid %in% !!filter_results()$uid)
         
-        rresults <- results %>%
+        results <- results %>%
           rename(Authors = author,
                  Title = title,
                  Abstract = abstract,
@@ -1759,8 +1744,7 @@ search_Server <- function(id,
       
       search_results_download_endnote <- reactive({
         
-        # tbl(con, "unique_citations"), filter, collect
-        results <- citations_for_download %>%
+        results <- table %>%
           filter(uid %in% !!filter_results()$uid)
         
         results <- results %>%
@@ -2199,18 +2183,6 @@ download_table_UI <- function(id) {
         downloadBttn(
           ns("download_syrf"),
           label = "Download citations in SyRF upload format",
-          style = "unite",
-          color = "primary",
-          size = "sm",
-          block = FALSE,
-          no_outline = TRUE
-        ),
-        
-        br(),
-        p("Note for Rayyan export option below: download file and open in MS Excel first on your computer. Save as .csv in excel, then import saved file into Rayyan"),
-        downloadBttn(
-          ns("download_rayyan"),
-          label = "Download citations in Rayyan upload format",
           style = "unite",
           color = "primary",
           size = "sm",
