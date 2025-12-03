@@ -133,15 +133,15 @@ clean_regex_file <- function(regex_file) {
 #'
 #' @param con Connection to soles project db
 #' @param regexfile The path to the csv file containing the RegEx. The file should contain the following columns: `name`, `regex`, `type`, `main_category`, `sub_category1`, and `sub_category2`. If the ontology columns are empty, NAs will be introduced.
-#' @param master_node OSF node for project to retrieve.
-#' @param add_node OSF node for project to retrieve.
+#' @param master_node OSF node for project to retrieve current dictionary.
+#' @param add_node OSF node for project to retrieve and save indidual dictionaries.
 #'
 #' @details To be able to add new entries to the main dictionary, users will be asked to provide metadata such as the domain of new regex entries and their initials. This information will be included in the log file on OSF.
 #'
 #' @examples
 #' \dontrun{
 #' # Example usage:
-#' add_regex_soles(con, "path/to/new/regex.csv")
+#' add_regex_soles(con, "path/to/new/regex.csv", master_node = "nodestring", add_node = "nodestring")
 #' }
 #'
 #' @export
@@ -720,13 +720,13 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 #' @import dplyr
 #' @import osfr
 #' @param con Connection to soles project db
-#' @param master_node OSF node
+#' @param master_node OSF node for the project to retrieve the current dictionary.
 #'
 #'
 #' @examples
 #' \dontrun{
 #' # Example usage:
-#' check_pico(con)
+#' check_pico(con, master_node = "nodestring")
 #' }
 #'
 #' @export
