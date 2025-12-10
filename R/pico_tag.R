@@ -540,9 +540,12 @@ complete_pico_tag <- function(con, tag_method = "", tag_type = "", tag_main_cate
 #' Pico Retag
 #'
 #' @description
-#' A function to update your pico tags when changes to the pico dictionary have been made. This function
-#' uses the `complete_pico_tag()` and may take a long time to run. It is therefore recommended to schedule 
-#' it as a background process.
+#' Re-tag studies in the database based on a PICO tag type. This function updates the 
+#' `pico_tag` table by removing existing tags of the specified type and applying new tags 
+#' using the selected method. This function uses \code{complete_pico_tag()} internally 
+#' and may take a long time to run. Consider scheduling it as a background process. If you want to retag 
+#' using the most up-to-date PICO dictionary, run \code{check_pico()} before running this function. 
+#' 
 #' @param con a database connection
 #' @param tag_type A string specifying the PICO tag type to re-tag. Must match a value in the
 #'        `type` column of the `pico_ontology` database table.
@@ -570,14 +573,14 @@ pico_retag <- function(con, tag_type, tag_method = "both"){
   
   # Check the input for tag_method
   if (!tag_method %in% c("both", "tiabkw", "fulltext")) {
-    stop(message("Error: you have not entered a valid tag_method"))
+    stop("Error: you have not entered a valid tag_method")
   }
   
   pico_ont <- DBI::dbReadTable(con, "pico_ontology")
   
   # Check the input for tag_type
   if (!tag_type %in% unique(pico_ont$type)) {
-    stop(message("Error: you have not entered a valid tag_type"))
+    stop("Error: you have not entered a valid tag_type")
   }
   
   message(paste0("Removing current tags for ", tag_type, " from the database..."))
@@ -599,20 +602,31 @@ pico_retag <- function(con, tag_type, tag_method = "both"){
     
     message(paste0("Re-tagging the tiabkw and fulltext for ", tag_type, "..."))
     
-    try(solesR::complete_pico_tag(con = con, 
-                                  tag_method = "tiabkw", 
-                                  tag_type = tag_type))
+    # Tag tiabkw
+    tryCatch(
+      solesR::complete_pico_tag(con = con, tag_method = "tiabkw", tag_type = tag_type),
+      error = function(e) {
+        message("Error tagging tiabkw: ", e$message)
+      }
+    )
     
-    try(solesR::complete_pico_tag(con = con, 
-                                  tag_method = "fulltext", 
-                                  tag_type = tag_type))
+    # Tag fulltext
+    tryCatch(
+      solesR::complete_pico_tag(con = con, tag_method = "fulltext", tag_type = tag_type),
+      error = function(e) {
+        message("Error tagging fulltext: ", e$message)
+      }
+    )
     
   } else {
     
     message(paste0("Re-tagging the ", tag_method, " for ", tag_type, "..."))
     
-    try(solesR::complete_pico_tag(con = con, 
-                                  tag_method = tag_method, 
-                                  tag_type = tag_type))
+    tryCatch(
+      solesR::complete_pico_tag(con = con, tag_method = tag_method, tag_type = tag_type),
+      error = function(e) {
+        message("Error tagging ", tag_method, ": ", e$message)
+      }
+    )
   }
 }
