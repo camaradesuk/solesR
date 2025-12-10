@@ -2,42 +2,75 @@
 % Please edit documentation in R/screen_studies.R
 \name{run_error_correction}
 \alias{run_error_correction}
-\title{Run Error Correction}
+\title{Identify Studies for Error Correction Review}
 \usage{
 run_error_correction(
   con,
   k_fold_scores = as.character(),
   k_fold_thresholds = as.character(),
-  type = "extreme discrepancies",
-  number_to_be_re_reviewed = as.numeric()
+  abstracts_only = FALSE
 )
 }
 \arguments{
-\item{con}{A database connection object.}
+\item{con}{A database connection object (e.g., a \code{DBI} or \code{dplyr}
+connection) pointing to a database containing a table named
+\code{"unique_citations"}.}
 
-\item{k_fold_scores}{A character string specifying the file path to the CSV containing machine scores.}
+\item{k_fold_scores}{A character string specifying the file path to the CSV
+containing machine scores from \code{run_k_fold()} (for one repeat).
+The file must include columns for \code{uid}, \code{decision}, \code{score},
+\code{fold}, and \code{n_repeat}.}
 
-\item{k_fold_thresholds}{A character string specifying the file path to the CSV containing performance metrics.}
+\item{k_fold_thresholds}{A character string specifying the file path to the CSV
+containing the calibration results with fold-specific thresholds and performance metrics.
+The file must contain \code{fold} column for merging.}
 
-\item{type}{A character string specifying the type of selection method. Options are "extreme discrepancies" or "random".}
-
-\item{number_to_be_re_reviewed}{An integer specifying the number of studies to be re-reviewed.}
+\item{abstracts_only}{Logical; if \code{TRUE}, only disagreements with
+non-missing, non-empty abstracts are retained.
+Defaults to \code{FALSE}.}
 }
 \value{
-A dataframe containing the selected studies for re-review.
+A SyRF-formatted CSV file is also written to disk via \code{solesR::get_syrf_sample()}.
 }
 \description{
-This function identifies and selects studies for re-review based on disagreements between human and machine decisions.
-This function takes the results from the run_k_fold function on 1 repeat, which will contain a human screening decision and a machine score for each study.
+This function identifies studies that should be re-reviewed based on
+disagreements between human screening decisions and machine-predicted scores.
+It takes the output from a single repeat of the \code{run_k_fold()} function (where
+training_proportion == 1) which includes human decisions and machine scores for each
+study, and then compares each study’s score against its corresponding fold-specific threshold.
 }
+\details{
+Studies for which the machine prediction disagrees with the human decision
+are flagged as "disagreements." These can then be filtered, ranked, or sampled
+(e.g., selecting the most extreme cases, cases near the threshold, or random
+disagreements) depending on the user’s selection during interactive prompts.
+
+The function retrieves citation metadata from the database, merges it with the
+disagreement set, and outputs a SyRF-formatted CSV file containing the selected
+studies for re-review.
+}
+\section{Interactive Behavior}{
+
+The function prompts the user to choose one of the following selection types:
+\itemize{
+\item \strong{All} — return all disagreements.
+\item \strong{Random} — sample a user-specified number of disagreements.
+\item \strong{Nearest Threshold} — select disagreements with scores closest to the threshold.
+\item \strong{Extreme Discrepancies} — select disagreements with the largest absolute distance from the threshold.
+}
+
+Additional prompts guide the user if selected quantities exceed the available
+disagreements in either human-included or human-excluded groups.
+}
+
 \examples{
 \dontrun{
-# Run error correction with default parameters
-run_error_correction(con = my_connection,
-                     k_fold_scores = "k_fold_scores.csv",
-                     k_fold_thresholds = "k_fold_performance.csv",
-                     type = "extreme discrepancies",
-                     number_to_be_re_reviewed = 100)
+run_error_correction(
+  con = my_connection,
+  k_fold_scores = "k-fold-validation/output/ml_scores_all_091225for_EC.csv",
+  k_fold_thresholds = "k-fold-validation/results/calibration_results_091225for_EC.csv",
+  abstracts_only = TRUE
+)
 }
 
 }

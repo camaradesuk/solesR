@@ -709,45 +709,88 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
   return(combined_results)
 }
 
-#' Run Error Correction
+#' Identify Studies for Error Correction Review
 #'
-#' This function identifies and selects studies for re-review based on disagreements between human and machine decisions.
-#' This function takes the results from the run_k_fold function on 1 repeat, which will contain a human screening decision and a machine score for each study.
+#' This function identifies studies that should be re-reviewed based on 
+#' disagreements between human screening decisions and machine-predicted scores.  
+#' It takes the output from a single repeat of the `run_k_fold()` function (where 
+#' training_proportion == 1) which includes human decisions and machine scores for each 
+#' study, and then compares each study’s score against its corresponding fold-specific threshold.  
 #'
-#' @param con A database connection object.
-#' @param k_fold_scores A character string specifying the file path to the CSV containing machine scores.
-#' @param k_fold_thresholds A character string specifying the file path to the CSV containing performance metrics.
-#' @param type A character string specifying the type of selection method. Options are "extreme discrepancies" or "random".
-#' @param number_to_be_re_reviewed An integer specifying the number of studies to be re-reviewed.
+#' Studies for which the machine prediction disagrees with the human decision 
+#' are flagged as "disagreements." These can then be filtered, ranked, or sampled 
+#' (e.g., selecting the most extreme cases, cases near the threshold, or random 
+#' disagreements) depending on the user’s selection during interactive prompts.
 #'
-#' @return A dataframe containing the selected studies for re-review.
+#' The function retrieves citation metadata from the database, merges it with the 
+#' disagreement set, and outputs a SyRF-formatted CSV file containing the selected 
+#' studies for re-review.
 #'
+#' @param con A database connection object (e.g., a \code{DBI} or \code{dplyr} 
+#'   connection) pointing to a database containing a table named 
+#'   \code{"unique_citations"}.
+#'
+#' @param k_fold_scores A character string specifying the file path to the CSV 
+#'   containing machine scores from \code{run_k_fold()} (for one repeat).  
+#'   The file must include columns for \code{uid}, \code{decision}, \code{score}, 
+#'   \code{fold}, and \code{n_repeat}.
+#'
+#' @param k_fold_thresholds A character string specifying the file path to the CSV 
+#'   containing the calibration results with fold-specific thresholds and performance metrics.  
+#'   The file must contain \code{fold} column for merging.
+#'
+#' @param abstracts_only Logical; if \code{TRUE}, only disagreements with 
+#'   non-missing, non-empty abstracts are retained.  
+#'   Defaults to \code{FALSE}.
+#'
+#' @return  A SyRF-formatted CSV file is also written to disk via \code{solesR::get_syrf_sample()}.
+#'
+#' @section Interactive Behavior:
+#' The function prompts the user to choose one of the following selection types:
+#' \itemize{
+#'   \item \strong{All} — return all disagreements.
+#'   \item \strong{Random} — sample a user-specified number of disagreements.
+#'   \item \strong{Nearest Threshold} — select disagreements with scores closest to the threshold.
+#'   \item \strong{Extreme Discrepancies} — select disagreements with the largest absolute distance from the threshold.
+#' }
+#'
+#' Additional prompts guide the user if selected quantities exceed the available 
+#' disagreements in either human-included or human-excluded groups.
+#'
+#' @import dplyr
+#' @importFrom janitor clean_names
+#' @importFrom solesR get_syrf_sample
+#' 
 #' @examples
 #' \dontrun{
-#' # Run error correction with default parameters
-#' run_error_correction(con = my_connection,
-#'                      k_fold_scores = "k_fold_scores.csv",
-#'                      k_fold_thresholds = "k_fold_performance.csv",
-#'                      type = "extreme discrepancies",
-#'                      number_to_be_re_reviewed = 100)
+#' run_error_correction(
+#'   con = my_connection,
+#'   k_fold_scores = "k-fold-validation/output/ml_scores_all_091225for_EC.csv",
+#'   k_fold_thresholds = "k-fold-validation/results/calibration_results_091225for_EC.csv",
+#'   abstracts_only = TRUE
+#' )
 #' }
 #'
 #' @export
 run_error_correction <- function(con,
                                  k_fold_scores = as.character(),
                                  k_fold_thresholds = as.character(),
-                                 type = "extreme discrepancies",
-                                 number_to_be_re_reviewed = as.numeric()){
+                                 abstracts_only = FALSE) {
   
   set.seed(123)
   
-  thresholds <- read.csv(k_fold_thresholds)
+  # Read in thresholds
+  thresholds <- read.csv(k_fold_thresholds) %>% 
+    filter(n_repeat == 1)
   
+  # Read in scores and labels and connect to thresholds
   k_fold_scores <-  read.csv(k_fold_scores) %>%
+    filter(n_repeat == 1) %>% 
     left_join(thresholds, by = "fold") %>%
     janitor::clean_names() %>%
-    select(uid, label = decision, fold, threshold, score)
+    select(uid, label = decision, threshold, score)
   
+  # Calculate disagreements between human and machine
   disagreements <- k_fold_scores %>%
     mutate(disagreement = case_when(
       (label == 1 & score < threshold) ~ TRUE,
@@ -757,98 +800,198 @@ run_error_correction <- function(con,
     filter(disagreement == TRUE) %>% 
     mutate(uid = sub("^wos:", "wos-", uid))
   
-  
-  # Calculate the number of folds
-  number_folds <- length(unique(k_fold_scores$fold))
-  
-  message(paste0("Total number of disagreements found: ", nrow(disagreements)))
-
-  
-  unique_citations <- tbl(con, "unique_citations") %>%
+  # Connect to metadata in database
+  all_disagreements <- tbl(con, "unique_citations") %>%
     filter(uid %in% disagreements$uid) %>% 
     select(uid, title, abstract, author, year, doi, journal) %>%
-    collect()
+    collect() %>% 
+    left_join(disagreements, by = "uid") %>% 
+    mutate(distance = abs(threshold - score))
   
   # Keep only the disagreements with abstracts for studies to be re-screened
-  disagreements_abstracts_only <- disagreements %>%
-    select(uid, score, label) %>%
-    left_join(unique_citations, by = c("uid")) 
+  if (abstracts_only){
+    all_disagreements <- all_disagreements %>%
+      filter(!is.na(abstract) | !abstract == "")
+    
+    message(paste0("Total number of disagreements found (with abstracts): ", nrow(all_disagreements)))
+    
+  } else{
+    
+    message(paste0("Total number of disagreements found: ", nrow(all_disagreements)))
+    
+  }
   
-  message(paste0("Total number of disagreements found: ", nrow(disagreements_abstracts_only)))
+  # Ask user which studies they would like for re-review
+  type_answer <- menu(
+    c("All", "Random", "Nearest Threshold", "Extreme Discrepancies"),
+    title = paste0(
+      "What studies would you like for re-review?"
+    )
+  )
   
-  if (type == "extreme discrepancies"){
+  if (type_answer != 1){
     
-    message(paste0("Finding ", number_to_be_re_reviewed, " studies with the most extreme discrepancies between Human and Machine descisions..."))
+    # If not all studies, how many for re-review
+    num_studies <- as.numeric(
+      readline("How many studies would you like for re-review? ")
+    )
     
-    # Calculate number of disagreements which were included/excluded by the human reviewer
-    # Take the most "extreme" disagreements from each side, at the specified amount
-    disagreements_human_included <- disagreements_abstracts_only %>%
-      filter(label == 1) %>%
-      arrange(score) %>%
-      head(number_to_be_re_reviewed/2)
-    
-    disagreements_human_excluded <- disagreements_abstracts_only %>%
-      filter(label == 0) %>%
-      arrange(desc(score)) %>%
-      head(number_to_be_re_reviewed/2)
-    
-    # If the requested number for re-screening is greater than the number of disagreements included by human, ask user to take disagreements from human excluded side
-    if (nrow(disagreements_human_included) < (number_to_be_re_reviewed/2)){
-      
-      answer <- menu(
-        c("Yes", "No"),
-        title = paste0(
-          "Number of disagreements between human and machine (which the human \"Included\"), is less than ", 
-          (number_to_be_re_reviewed/2), 
-          ".\n",
-          "Would you like to take the remaining amount from the disagreements which the human \"Excluded\"?"
-        )
-      )
-      
-      
-      if (answer == 1){
-        
-        disagreements_human_excluded <- disagreements_abstracts_only %>%
-          filter(label == 0) %>%
-          arrange(desc(score)) %>%
-          head(number_to_be_re_reviewed - nrow(disagreements_human_included))
-      }
-      
-      # If the requested number for re-screening is greater than the number of disagreements "Excluded" by human, ask user to take disagreements from human "Included" side
-    }else if ((nrow(disagreements_human_excluded) < (number_to_be_re_reviewed/2))){
-      
-      answer <- menu(
-        c("Yes", "No"),
-        title = paste0(
-          "Number of disagreements between human and machine (which the human \"Excluded\"), is less than ", 
-          (number_to_be_re_reviewed/2), 
-          ".\n",
-          "Would you like to take the remaining amount from the disagreements which the human \"Included\"?"
-        )
-      )
-      
-      
-      if (answer == 1){
-        
-        disagreements_human_included <- disagreements_abstracts_only %>%
-          filter(label == 1) %>%
-          arrange(desc(score)) %>%
-          head(number_to_be_re_reviewed - nrow(disagreements_human_excluded))
-        
-      }
+    if (num_studies > nrow(all_disagreements)) {
+      stop("Requested more studies than available.")
     }
     
-    # Combine "extreme discrepancies" which the human included and excluded
-    total_to_re_screen <- disagreements_human_excluded %>%
-      rbind(disagreements_human_included)
+    cat("You selected type:", type_answer, "\n")
+    cat("Number of studies:", num_studies, "\n")
     
+    if (type_answer == 4){
+      
+      # Calculate number of disagreements which were included/excluded by the human reviewer
+      # Take the most "extreme" disagreements from each side, at the specified amount
+      message(paste0("Finding ", num_studies, " studies with the most extreme discrepancies between Human and Machine descisions..."))
+      
+      disagreements_human_included <- all_disagreements %>%
+        filter(label == 1) %>%
+        arrange(desc(distance)) %>%
+        head(num_studies/2)
+      
+      disagreements_human_excluded <- all_disagreements %>%
+        filter(label == 0) %>%
+        arrange(desc(distance)) %>%
+        head(num_studies/2)
+      
+      # If the requested number for re-screening is greater than the number of disagreements included by human, 
+      # ask user to take disagreements from human excluded side
+      if (nrow(disagreements_human_included) < (number_to_be_re_reviewed/2)){
+        
+        answer <- menu(
+          c("Yes", "No"),
+          title = paste0(
+            "Number of disagreements between human and machine (which the human \"Included\"), is less than ", 
+            (num_studies/2), 
+            ".\n",
+            "Would you like to take the remaining amount from the disagreements which the human \"Excluded\"?"
+          )
+        )
+        
+        
+        if (answer == 1){
+          
+          disagreements_human_excluded <- all_disagreements %>%
+            filter(label == 0) %>%
+            arrange(desc(distance)) %>%
+            head(num_studies - nrow(disagreements_human_included))
+        }
+        
+        # If the requested number for re-screening is greater than the number of disagreements "Excluded" by human, 
+        # ask user to take disagreements from human "Included" side
+      }else if ((nrow(disagreements_human_excluded) < (number_to_be_re_reviewed/2))){
+        
+        answer <- menu(
+          c("Yes", "No"),
+          title = paste0(
+            "Number of disagreements between human and machine (which the human \"Excluded\"), is less than ", 
+            (num_studies/2), 
+            ".\n",
+            "Would you like to take the remaining amount from the disagreements which the human \"Included\"?"
+          )
+        )
+        
+        if (answer == 1){
+          
+          disagreements_human_included <- all_disagreements %>%
+            filter(label == 1) %>%
+            arrange(desc(distance)) %>%
+            head(num_studies - nrow(disagreements_human_excluded))
+          
+        }
+      }
+      
+      # Combine "extreme discrepancies" which the human included and excluded
+      total_to_re_screen <- disagreements_human_excluded %>%
+        rbind(disagreements_human_included)
+      
+      
+      # If the user wants to re-review a certain number of random studies where the machine disagreed with the human reviewer
+    } else if (type_answer == 3){
+      
+      message(paste0("Finding ", num_studies, " studies nearest the threshold which have potentially been misclassified"))
+      
+      # Calculate the num_studies nearest the threshold
+      disagreements_human_included <- all_disagreements %>%
+        filter(label == 1) %>%
+        arrange(distance) %>%
+        head(num_studies/2)
+      
+      disagreements_human_excluded <- all_disagreements %>%
+        filter(label == 0) %>%
+        arrange(distance) %>%
+        head(num_studies/2)
+      
+      
+      # If the requested number for re-screening is greater than the number of disagreements included by human, 
+      # ask user to take disagreements from human excluded side
+      if (nrow(disagreements_human_included) < (num_studies/2)){
+        
+        answer <- menu(
+          c("Yes", "No"),
+          title = paste0(
+            "Number of disagreements between human and machine (which the human \"Included\"), is less than ", 
+            (num_studies/2), 
+            ".\n",
+            "Would you like to take the remaining amount from the disagreements which the human \"Excluded\"?"
+          )
+        )
+        
+        if (answer == 1){
+          
+          disagreements_human_excluded <- all_disagreements %>%
+            filter(label == 0) %>%
+            arrange(distance) %>%
+            head(num_studies - nrow(disagreements_human_included))
+        }
+        
+        # If the requested number for re-screening is greater than the number of disagreements "Excluded" by human, 
+        # ask user to take disagreements from human "Included" side
+      }else if ((nrow(disagreements_human_excluded) < (num_studies/2))){
+        
+        answer <- menu(
+          c("Yes", "No"),
+          title = paste0(
+            "Number of disagreements between human and machine (which the human \"Excluded\"), is less than ", 
+            (num_studies/2), 
+            ".\n",
+            "Would you like to take the remaining amount from the disagreements which the human \"Included\"?"
+          )
+        )
+        
+        if (answer == 1){
+          
+          disagreements_human_included <- all_disagreements %>%
+            filter(label == 1) %>%
+            arrange(distance) %>%
+            head(num_studies - nrow(disagreements_human_excluded))
+          
+        }
+      }
+      
+      # Combine studies nearest the threshold which the human included and excluded
+      total_to_re_screen <- disagreements_human_excluded %>%
+        rbind(disagreements_human_included)
+      
+    } else if (type_answer == 2){
+      
+      # Calculate a random sample of num_studies specified by the user for re-review
+      message(paste0("Finding ", num_studies, " studies at random with disagreements between the human and machine..."))
+      
+      total_to_re_screen <- all_disagreements[sample(nrow(all_disagreements), num_studies), ]
+      
+    }
+  } else if (type_answer == 1){
     
-    # If the user wants to re-review a certain number of random studies where the machine disagreed with the human reviewer
-  } else if (type == "random"){
+    # Return all studies for re-review
+    message(paste0("Finding all studies at with disagreements between the human and machine..."))
     
-    message(paste0("Finding ", number_to_be_re_reviewed, " studies at random with disagreements between the human and machine..."))
-    
-    total_to_re_screen <- disagreements_abstracts_only[sample(nrow(disagreements_abstracts_only), number_to_be_re_reviewed), ]
+    total_to_re_screen <- all_disagreements
     
   }
   
@@ -856,10 +999,8 @@ run_error_correction <- function(con,
   total_to_re_screen <- total_to_re_screen[sample(nrow(total_to_re_screen)), ]
   
   # Use get_syrf_sample to return csv in correct format for SyRF
-  total_to_re_screen <- get_syrf_sample(total_to_re_screen, sample_size = nrow(total_to_re_screen), abstracts_only = FALSE)
+  solesR::get_syrf_sample(total_to_re_screen, sample_size = nrow(total_to_re_screen), abstracts_only = FALSE)
   
-  message(paste0(nrow(total_to_re_screen), " studies for re-review written to syrf_sample_date.csv and returned in dataframe"))
-  
-  return(total_to_re_screen)
+  message(paste0(nrow(total_to_re_screen), " studies for re-review written to syrf_sample_date.csv"))
   
 }
