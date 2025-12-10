@@ -757,10 +757,6 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
 #' Additional prompts guide the user if selected quantities exceed the available 
 #' disagreements in either human-included or human-excluded groups.
 #'
-#' @import dplyr
-#' @importFrom janitor clean_names
-#' @importFrom solesR get_syrf_sample
-#' 
 #' @examples
 #' \dontrun{
 #' run_error_correction(
@@ -771,6 +767,9 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
 #' )
 #' }
 #'
+#' @import dplyr
+#' @importFrom janitor clean_names
+#' @importFrom solesR get_syrf_sample
 #' @export
 run_error_correction <- function(con,
                                  k_fold_scores = as.character(),
@@ -783,9 +782,34 @@ run_error_correction <- function(con,
   thresholds <- read.csv(k_fold_thresholds) %>% 
     filter(n_repeat == 1)
   
+  # Check required columns in thresholds
+  required_threshold_cols <- c("fold", "threshold", "n_repeat")
+  missing_threshold_cols <- setdiff(required_threshold_cols, colnames(thresholds))
+  
+  if (length(missing_threshold_cols) > 0) {
+    stop(paste0(
+      "Thresholds file seems incorrect. Looking for calibration_results file from run_k_fold() results.\n",
+      "Missing columns: ", paste(missing_threshold_cols, collapse = ", ")
+    ))
+  }
+  
   # Read in scores and labels and connect to thresholds
-  k_fold_scores <-  read.csv(k_fold_scores) %>%
-    filter(n_repeat == 1) %>% 
+  k_fold_scores <- read.csv(k_fold_scores) %>%
+    filter(n_repeat == 1)
+  
+  # Check required columns in k_fold_scores
+  required_scores_cols <- c("uid", "decision", "score", "fold", "n_repeat")
+  missing_scores_cols <- setdiff(required_scores_cols, colnames(k_fold_scores))
+  
+  if (length(missing_scores_cols) > 0) {
+    stop(paste0(
+      "k_fold_scores file seems incorrect. Looking for ml_scores_all files from run_k_fold() output.\n",
+      "Missing columns: ", paste(missing_scores_cols, collapse = ", ")
+    ))
+  }
+  
+  # Join with thresholds
+  k_fold_scores <- k_fold_scores %>%
     left_join(thresholds, by = "fold") %>%
     janitor::clean_names() %>%
     select(uid, label = decision, threshold, score)
