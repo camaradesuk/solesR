@@ -861,7 +861,7 @@ run_error_correction <- function(con,
       
       # If the requested number for re-screening is greater than the number of disagreements included by human, 
       # ask user to take disagreements from human excluded side
-      if (nrow(disagreements_human_included) < (number_to_be_re_reviewed/2)){
+      if (nrow(disagreements_human_included) < (num_studies/2)){
         
         answer <- menu(
           c("Yes", "No"),
@@ -884,7 +884,7 @@ run_error_correction <- function(con,
         
         # If the requested number for re-screening is greater than the number of disagreements "Excluded" by human, 
         # ask user to take disagreements from human "Included" side
-      }else if ((nrow(disagreements_human_excluded) < (number_to_be_re_reviewed/2))){
+      }else if ((nrow(disagreements_human_excluded) < (num_studies/2))){
         
         answer <- menu(
           c("Yes", "No"),
