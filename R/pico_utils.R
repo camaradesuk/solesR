@@ -139,7 +139,7 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 
   # first check if soles db is up to date with OSF
   message("Checking status of db pico tables...")
-  update <- check_pico(con)
+  update <- check_pico(con, master_node = master_node)
 
   # create clean temp dir
 
@@ -506,7 +506,6 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
                                                 row.names = FALSE))
         
         dict_2split <- pico_o_new %>%
-          select(-id) %>% 
           left_join(pico_d_new, by = c("regex_id" = "id")) %>% 
           rename(id = regex_id) %>% 
           select(id, regex, type)
