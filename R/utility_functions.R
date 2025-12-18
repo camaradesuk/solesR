@@ -273,7 +273,8 @@ syrf_decisions_to_db <- function(con,
       mutate(decision = ifelse(decision == "excluded", "exclude", decision)) %>%
       filter(decision %in% c("include", "exclude")) %>%
       group_by(uid, decision) %>%
-      slice_head()
+      slice_head() %>% 
+      ungroup()
 
 
     message("\033[31m", "Do you want to append the training data to the study_classification table in the database?  (yes/no): ", "\033[0m", appendLF = FALSE)
