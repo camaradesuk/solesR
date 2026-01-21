@@ -835,6 +835,7 @@ check_pico <- function(con, master_node) {
 #'
 #' @import openxlsx
 #' @import dplyr
+#' @import here
 #' @importFrom openxlsx write.xlsx
 #'
 #' @export
