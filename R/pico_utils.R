@@ -833,7 +833,7 @@ check_pico <- function(con, master_node) {
 #'
 #' @return A new Excel file with additional columns containing regular expressions.
 #'
-#' @import readxl
+#' @import openxlsx
 #' @import dplyr
 #' @importFrom openxlsx write.xlsx
 #'
