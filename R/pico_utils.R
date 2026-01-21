@@ -845,9 +845,9 @@ check_pico <- function(con, master_node) {
 #' create_regex("input_file.xlsx")
 #' }
 #'
-create_regex <- function(file = "") {
+create_regex <- function(path = "", file = "") {
   # Read in file
-  file_for_regex <- read.xlsx(file)
+  file_for_regex <- read.xlsx(here::here(path, file))
 
   # Splits the df in to 2, no_alternate_names and with_alternate_names
   no_alternate_names <- file_for_regex %>%
@@ -949,7 +949,7 @@ create_regex <- function(file = "") {
 
   # Create a new file name
   new_file_name <- paste0("updated_regex_", file)
-  write.xlsx(file_with_regex, new_file_name)
+  write.xlsx(file_with_regex, here::here(path, new_file_name))
 
   message(paste0("File updated with regex and written to working directory"))
   message(paste0("File named: ", new_file_name))
