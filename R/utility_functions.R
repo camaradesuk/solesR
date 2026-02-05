@@ -10,16 +10,25 @@
 #'
 #' @return A DataFrame with the 'doi' column formatted for consistency.
 #' @export
-format_doi <- function(df){
-
+format_doi <- function(df) {
   df$doi <- tolower(df$doi)
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("%28", "(", x)))
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("%29", ")", x)))
-  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("http://dx.doi.org/", "", x)))
-  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("https://doi.org/", "", x)))
-  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("https://dx.doi.org/", "", x)))
-  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("http://doi.org/", "", x)))
-  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("doi: ", "", x)))
+  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) {
+    gsub("http://dx.doi.org/", "", x)
+  }))
+  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) {
+    gsub("https://doi.org/", "", x)
+  }))
+  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) {
+    gsub("https://dx.doi.org/", "", x)
+  }))
+  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) {
+    gsub("http://doi.org/", "", x)
+  }))
+  df["doi"] <- as.data.frame(sapply(df["doi"], function(x) {
+    gsub("doi: ", "", x)
+  }))
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("doi:", "", x)))
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("doi", "", x)))
   return(df)
@@ -54,8 +63,7 @@ format_doi <- function(df){
 #' @importFrom rlang sym
 #'
 #' @export
-check_na_cols <- function(df){
-
+check_na_cols <- function(df) {
   # Initialize an empty list to store the results for each column
   na_counts_list <- list()
 
@@ -86,29 +94,34 @@ check_na_cols <- function(df){
 #'
 #'
 
-medline2df <- function(M){
+medline2df <- function(M) {
   # get authors from medline object
-  authors <- tibble(author = RISmed::Author(M),
-                    pmid = RISmed::PMID(M)) %>%
+  authors <- tibble(author = RISmed::Author(M), pmid = RISmed::PMID(M)) %>%
     tidyr::unnest(author) %>%
     group_by(pmid) %>%
-    tidyr::unite(c("LastName","ForeName") , col = "author", sep = ", ") %>%
+    tidyr::unite(c("LastName", "ForeName"), col = "author", sep = ", ") %>%
     mutate(author = paste(author, collapse = "; ")) %>%
     select(pmid, author) %>%
     unique()
 
   # get all other metadata from medline object
-  df <- tibble(keywords = RISmed::Keywords(M),
-               abstract = RISmed::AbstractText(M), author_country = RISmed::Country(M),
-               title = RISmed::ArticleTitle(M), pages = RISmed::MedlinePgn(M),
-               issue = RISmed::Issue(M), volume = RISmed::Volume(M),
-               year = RISmed::YearArticleDate(M), pmid = RISmed::PMID(M),
-               doi = RISmed::DOI(M), issn = RISmed::ISSN(M),
-               journal = RISmed::Title(M),
-               url= paste0("https://www.ncbi.nlm.nih.gov/pubmed/", pmid),
-               uid = paste0("pubmed-", pmid),
-               source = "pubmed",
-               date = format(Sys.Date(), "%d%m%y")
+  df <- tibble(
+    keywords = RISmed::Keywords(M),
+    abstract = RISmed::AbstractText(M),
+    author_country = RISmed::Country(M),
+    title = RISmed::ArticleTitle(M),
+    pages = RISmed::MedlinePgn(M),
+    issue = RISmed::Issue(M),
+    volume = RISmed::Volume(M),
+    year = RISmed::YearArticleDate(M),
+    pmid = RISmed::PMID(M),
+    doi = RISmed::DOI(M),
+    issn = RISmed::ISSN(M),
+    journal = RISmed::Title(M),
+    url = paste0("https://www.ncbi.nlm.nih.gov/pubmed/", pmid),
+    uid = paste0("pubmed-", pmid),
+    source = "pubmed",
+    date = format(Sys.Date(), "%d%m%y")
   ) %>%
     # reformat columns into soles format
     tidyr::unnest_longer(keywords) %>%
@@ -118,12 +131,11 @@ medline2df <- function(M){
     unique() %>%
     select(-c(keywords_id)) %>%
     # add author metadata
-    left_join(authors, by="pmid") %>%
+    left_join(authors, by = "pmid") %>%
     relocate(author)
 
   df[df == "NA"] <- NA
   return(df)
-
 }
 
 #' Get a sample of citations for screening in SyRF
@@ -146,80 +158,101 @@ medline2df <- function(M){
 #' }
 #'
 #' @export
-get_syrf_sample <- function(df, sample_size = 2000, abstracts_only = TRUE){
-
+get_syrf_sample <- function(df, sample_size = 2000, abstracts_only = TRUE) {
   date <- format(Sys.Date(), "%d%m%y")
 
   if (abstracts_only) {
-
     df_with_abstracts <- df %>%
-      filter(!(is.na(abstract) | 
-                 abstract == "" | 
-                 stringr::str_detect(abstract, stringr::regex("no abstract available", ignore_case = TRUE))))
+      filter(
+        !(is.na(abstract) |
+          abstract == "" |
+          stringr::str_detect(
+            abstract,
+            stringr::regex("no abstract available", ignore_case = TRUE)
+          ))
+      )
 
-    abstracts_only_sample <- df_with_abstracts[sample(nrow(df_with_abstracts), sample_size), ]
+    abstracts_only_sample <- df_with_abstracts[
+      sample(nrow(df_with_abstracts), sample_size),
+    ]
 
     syrf_sample <- abstracts_only_sample %>%
-      rename(Authors = author,
-             Title = title,
-             Abstract = abstract,
-             Year = year,
-             DOI= doi,
-             PublicationName = journal) %>%
-      mutate(Url = "",
-             AuthorAddress = "",
-             AlternateName = "",
-             ReferenceType = "",
-             CustomId = uid,
-             Keywords = "",
-             PdfRelativePath = paste0(uid, ".pdf")) %>%
-      select(Title,
-             Authors,
-             PublicationName,
-             AlternateName,
-             Abstract,
-             Url,
-             AuthorAddress,
-             Year,
-             DOI,
-             ReferenceType,
-             Keywords,
-             PdfRelativePath,
-             CustomId)
-  } else{
-
-    all_citations_sample <-  df[sample(nrow(df), sample_size), ]
+      rename(
+        Authors = author,
+        Title = title,
+        Abstract = abstract,
+        Year = year,
+        DOI = doi,
+        PublicationName = journal
+      ) %>%
+      mutate(
+        Url = "",
+        AuthorAddress = "",
+        AlternateName = "",
+        ReferenceType = "",
+        CustomId = uid,
+        Keywords = "",
+        PdfRelativePath = paste0(uid, ".pdf")
+      ) %>%
+      select(
+        Title,
+        Authors,
+        PublicationName,
+        AlternateName,
+        Abstract,
+        Url,
+        AuthorAddress,
+        Year,
+        DOI,
+        ReferenceType,
+        Keywords,
+        PdfRelativePath,
+        CustomId
+      )
+  } else {
+    all_citations_sample <- df[sample(nrow(df), sample_size), ]
     syrf_sample <- all_citations_sample %>%
-      rename(Authors = author,
-             Title = title,
-             Abstract = abstract,
-             Year = year,
-             DOI= doi,
-             PublicationName = journal)  %>%
-      mutate(Url = "",
-             AuthorAddress = "",
-             AlternateName = "",
-             ReferenceType = "",
-             CustomId = uid,
-             Keywords = "",
-             PdfRelativePath = paste0(uid, ".pdf")) %>%
-      select(Title,
-             Authors,
-             PublicationName,
-             AlternateName,
-             Abstract,
-             Url,
-             AuthorAddress,
-             Year,
-             DOI,
-             ReferenceType,
-             Keywords,
-             PdfRelativePath,
-             CustomId)
-
+      rename(
+        Authors = author,
+        Title = title,
+        Abstract = abstract,
+        Year = year,
+        DOI = doi,
+        PublicationName = journal
+      ) %>%
+      mutate(
+        Url = "",
+        AuthorAddress = "",
+        AlternateName = "",
+        ReferenceType = "",
+        CustomId = uid,
+        Keywords = "",
+        PdfRelativePath = paste0(uid, ".pdf")
+      ) %>%
+      select(
+        Title,
+        Authors,
+        PublicationName,
+        AlternateName,
+        Abstract,
+        Url,
+        AuthorAddress,
+        Year,
+        DOI,
+        ReferenceType,
+        Keywords,
+        PdfRelativePath,
+        CustomId
+      )
   }
 
-  utils::write.csv(syrf_sample, paste0("syrf_sample_", date, ".csv"), row.names = F, quote=TRUE, na="")
+  utils::write.csv(
+    syrf_sample,
+    paste0("syrf_sample_", date, ".csv"),
+    row.names = F,
+    quote = TRUE,
+    na = ""
+  )
   message("file syrf_sample_date.csv written to working directory!")
   return(syrf_sample)
 }
@@ -251,54 +284,60 @@ get_syrf_sample <- function(df, sample_size = 2000, abstracts_only = TRUE){
 #' }
 #'
 #' @export
-syrf_decisions_to_db <- function(con,
-                                 file = "",
-                                 with_annotations = FALSE,
-                                 classifier_name = ""){
-
-  if (with_annotations == FALSE){
-
+syrf_decisions_to_db <- function(
+  con,
+  file = "",
+  with_annotations = FALSE,
+  classifier_name = ""
+) {
+  if (with_annotations == FALSE) {
     training_data <- read.csv(file) %>%
       janitor::clean_names() %>%
-      select(uid = custom_id, date = date_time_of_screening, decision = screening_status) %>%
-      mutate(uid = tolower(uid),
-             decision = tolower(decision),
-             date = substr(date, 1, 10),
-             date = lubridate::ymd(date),
-             type = "human_reviewer",
-             name = classifier_name,
-             score = NA_real_,
-             cid = 101) %>%
+      select(
+        uid = custom_id,
+        date = date_time_of_screening,
+        decision = screening_status
+      ) %>%
+      mutate(
+        uid = tolower(uid),
+        decision = tolower(decision),
+        date = substr(date, 1, 10),
+        date = lubridate::ymd(date),
+        type = "human_reviewer",
+        name = classifier_name,
+        score = NA_real_,
+        cid = 101
+      ) %>%
       mutate(decision = ifelse(decision == "included", "include", decision)) %>%
       mutate(decision = ifelse(decision == "excluded", "exclude", decision)) %>%
       filter(decision %in% c("include", "exclude")) %>%
       group_by(uid, decision) %>%
-      slice_head() %>% 
+      slice_head() %>%
       ungroup()
 
-
-    message("\033[31m", "Do you want to append the training data to the study_classification table in the database?  (yes/no): ", "\033[0m", appendLF = FALSE)
+    message(
+      "\033[31m",
+      "Do you want to append the training data to the study_classification table in the database?  (yes/no): ",
+      "\033[0m",
+      appendLF = FALSE
+    )
 
     # Read user input
     user_input <- readline()
 
     # Check the user's input
     if (tolower(user_input) == "yes") {
-
-      message("Writing human decisions to study classification table in database")
+      message(
+        "Writing human decisions to study classification table in database"
+      )
       dbWriteTable(con, "study_classification", training_data, append = TRUE)
-
     } else {
-
       message("Aborting function, data has not be written to database")
 
       return()
     }
-
-  } else if (with_annotations == TRUE){
-
+  } else if (with_annotations == TRUE) {
     message("Data must be cleaned manually and written to study_classification")
-
   }
 }
 
@@ -327,8 +366,7 @@ syrf_decisions_to_db <- function(con,
 #' @import DBI
 #'
 #'
-tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
-
+tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = "") {
   # Tag all remaining untagged included studies for open access ------------------
 
   # Get records already tagged
@@ -344,11 +382,12 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
     filter(!doi %in% tagged$doi) %>%
     filter(!is.na(doi))
 
-  message(paste0("Total number of studies to tag for Open Access: ", length(study_to_tag$doi)))
+  message(paste0(
+    "Total number of studies to tag for Open Access: ",
+    length(study_to_tag$doi)
+  ))
   total_new_oa_tags <- 0
-  while (total_new_oa_tags < length(study_to_tag$doi)){
-
-
+  while (total_new_oa_tags < length(study_to_tag$doi)) {
     # Papers tagged before running function
     pre_oa_tag <- DBI::dbReadTable(con, "oa_tag")
 
@@ -360,47 +399,52 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
 
     # If no new studies are tagged then exit the loop
     running_new_tags <- length(post_oa_tag$doi) - length(pre_oa_tag$doi)
-    if (running_new_tags == 0){
-
+    if (running_new_tags == 0) {
       break
-
     }
 
     total_new_oa_tags <- length(post_oa_tag$doi) - length(tagged$doi)
-    message(paste0("Total citations tagged for Open Access: ", total_new_oa_tags))
-
+    message(paste0(
+      "Total citations tagged for Open Access: ",
+      total_new_oa_tags
+    ))
   }
 
-
-  message(paste0(total_new_oa_tags, " out of a possible ", length(study_to_tag$doi), " tagged for Open Access Status"))
-
-
+  message(paste0(
+    total_new_oa_tags,
+    " out of a possible ",
+    length(study_to_tag$doi),
+    " tagged for Open Access Status"
+  ))
 
   # Tag all remaining included studies for Open Data---------------------
 
   tagged <- DBI::dbReadTable(con, "open_data_tag")
   path <- "full_texts/"
   text_files <- list.files(path = path, pattern = ".txt", full.names = TRUE)
-  text_files <- gsub(paste0(path,"/"), "", text_files)
+  text_files <- gsub(paste0(path, "/"), "", text_files)
   text_files <- gsub("\\.txt", "", text_files)
   text_files <- gsub("%2F", "\\/", text_files)
-  text_files  <- gsub("%3C", "<", text_files)
-  text_files  <- gsub("%3E", ">", text_files)
-  text_files  <- gsub("%3A", ":", text_files)
-  text_files  <- gsub("%22", '"', text_files)
-  text_files  <- gsub("%7C", "\\|", text_files)
-  text_files  <- gsub("%3F", "\\?", text_files)
-  text_files  <- gsub("%2A", "\\*", text_files)
+  text_files <- gsub("%3C", "<", text_files)
+  text_files <- gsub("%3E", ">", text_files)
+  text_files <- gsub("%3A", ":", text_files)
+  text_files <- gsub("%22", '"', text_files)
+  text_files <- gsub("%7C", "\\|", text_files)
+  text_files <- gsub("%3F", "\\?", text_files)
+  text_files <- gsub("%2A", "\\*", text_files)
 
   # Identify full texts that require tag
-  ft_to_tag <- dbReadTable(con, "full_texts") %>% filter(status == "found") %>%
+  ft_to_tag <- dbReadTable(con, "full_texts") %>%
+    filter(status == "found") %>%
     filter(!doi %in% tagged$doi) %>%
     filter(doi %in% text_files)
 
-  message(paste0("Total number of studies to tag for Open Data: ", length(ft_to_tag$doi)))
+  message(paste0(
+    "Total number of studies to tag for Open Data: ",
+    length(ft_to_tag$doi)
+  ))
   total_new_od_tags <- 0
-  while (total_new_od_tags < length(ft_to_tag$doi)){
-
+  while (total_new_od_tags < length(ft_to_tag$doi)) {
     # Papers tagged before running function
     pre_od_tag <- DBI::dbReadTable(con, "open_data_tag")
 
@@ -412,8 +456,7 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
 
     # If no new studies are tagged then exit the loop
     running_od_tags <- length(post_od_tag$doi) - length(pre_od_tag$doi)
-    if (running_od_tags == 0){
-
+    if (running_od_tags == 0) {
       break
     }
 
@@ -421,9 +464,12 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
     message(paste0("Total citations tagged for Open Data: ", total_new_od_tags))
   }
 
-  message(paste0(total_new_od_tags, " out of a possible ", length(ft_to_tag$doi), " tagged for Open Data"))
-
-
+  message(paste0(
+    total_new_od_tags,
+    " out of a possible ",
+    length(ft_to_tag$doi),
+    " tagged for Open Data"
+  ))
 
   # Tag all remaining included studies for Risk of Bias------------------
 
@@ -434,9 +480,12 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
   pdfs_checked <- dbReadTable(con, "full_texts")
 
   # get list of smaller files
-  all_files <- list.files(path="full_texts/", pattern=".txt", full.names= T)
+  all_files <- list.files(
+    path = "full_texts/",
+    pattern = ".txt",
+    full.names = T
+  )
   all_files <- gsub("\\/\\/", "/", all_files)
-
 
   # filter files based on size
   max_file_size <- rob_max_file_size
@@ -450,14 +499,16 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
     filter(status == "found") %>%
     rename(id = doi) %>%
     filter(!id %in% rob_tagged$doi) %>%
-    select(path,id) %>%
+    select(path, id) %>%
     filter(path %in% all_files) %>%
     mutate(path = paste0(dir, "/", path))
 
-  message(paste0("Total number of studies to tag for RoB: ", length(citations_to_tag$id)))
+  message(paste0(
+    "Total number of studies to tag for RoB: ",
+    length(citations_to_tag$id)
+  ))
   total_new_rob_tags <- 0
-  while (total_new_rob_tags < length(citations_to_tag$id)){
-
+  while (total_new_rob_tags < length(citations_to_tag$id)) {
     # Papers tagged before running function
     pre_rob_tag <- DBI::dbReadTable(con, "rob_tag")
 
@@ -469,31 +520,38 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
 
     # If no new studies are tagged then exit the loop
     running_rob_tag <- length(post_rob_tag$doi) - length(pre_rob_tag$doi)
-    if (running_rob_tag == 0){
-
+    if (running_rob_tag == 0) {
       break
     }
 
     total_new_rob_tags <- length(post_rob_tag$doi) - length(rob_tagged$doi)
-    message(paste0("Total citations tagged for Risk of Bias: ", total_new_rob_tags))
-
+    message(paste0(
+      "Total citations tagged for Risk of Bias: ",
+      total_new_rob_tags
+    ))
   }
 
-  message(paste0(total_new_rob_tag, " out of a possible ", length(citations_to_tag$doi), " tagged for Risk of Bias"))
-
+  message(paste0(
+    total_new_rob_tag,
+    " out of a possible ",
+    length(citations_to_tag$doi),
+    " tagged for Risk of Bias"
+  ))
 
   message(paste0("Total citations tagged for Open Access: ", total_new_oa_tags))
   message(paste0("Total citations tagged for Open Data: ", total_new_od_tags))
-  message(paste0("Total citations tagged for Risk of Bias: ", total_new_rob_tags))
-
+  message(paste0(
+    "Total citations tagged for Risk of Bias: ",
+    total_new_rob_tags
+  ))
 }
 
 #' Remove HTML tags from text
-#' 
+#'
 #' A function that can be used to remove HTML tags from titles and abstracts
 #'
 #' @param string The input text for formatting
-#' 
+#'
 #' @return This function returns the formatted input string, with HTML tags removed.
 #'
 #' @details Currently, only basic text formatting tags are identified and removed. See: https://www.w3schools.com/html/html_formatting.asp
@@ -506,29 +564,28 @@ tag_update_oa_od_rob <- function(con, rob_max_file_size = 500000, email = ""){
 #' }
 #'
 #' @export
-#' 
+#'
 
 rm_html_tags <- function(string) {
-  
   pattern <- "<\\/?i>|<\\/?su(p|b)>|<\\/?bold>|<\\/?b>|<\\/?em>|<\\/?mark>|
   <\\/?small>|<\\/?del>|<\\/?in(s|f)>"
-  
+
   try(string_nohtml <- gsub(pattern, "", string, ignore.case = T))
-  
-  if(is.null(string_nohtml))
+
+  if (is.null(string_nohtml)) {
     return(string)
-  
-  else if(!is.null(string_nohtml))
+  } else if (!is.null(string_nohtml)) {
     return(string_nohtml)
+  }
 }
 
 #' Format title and abstract character strings
-#' 
-#' This function performs various formatting operations on the title and abstract columns of a SOLES dataframe. These include: removal of leading and trailing whitespace, removal of double backslashes, 
+#'
+#' This function performs various formatting operations on the title and abstract columns of a SOLES dataframe. These include: removal of leading and trailing whitespace, removal of double backslashes,
 #' replacement of 2+ spaces with single space and removal of leading characters (en dash, em dash, hyphen, colon, dot).
 #'
 #' @param df The SOLES dataframe to be formatted (e.g., `unique_citations` or `retrieved_citations`)
-#' 
+#'
 #' @return This function returns the formatted dataframe
 #'
 #'
@@ -542,23 +599,179 @@ rm_html_tags <- function(string) {
 #' }
 #'
 #' @export
-#' 
+#'
 
 format_tiab <- function(df) {
-  
   try(
-    df <- df %>% 
-      # removes leading/trailing whitespace 
-      mutate(across(c(title, abstract), ~trimws(., "both"))) %>%
+    df <- df %>%
+      # removes leading/trailing whitespace
+      mutate(across(c(title, abstract), ~ trimws(., "both"))) %>%
       # removes leading dashes and other characters, including when preceded or followed by a space
-      mutate(across(c(title, abstract), ~trimws(., "left", whitespace = "\\s?(\\.|\\:|\\-|\u2013|\u2014|\\-)\\s?"))) %>%
+      mutate(across(
+        c(title, abstract),
+        ~ trimws(
+          .,
+          "left",
+          whitespace = "\\s?(\\.|\\:|\\-|\u2013|\u2014|\\-)\\s?"
+        )
+      )) %>%
       # replaces multiple spaces with a single space and replaces the phrase 'textbackslash' if present with a space
-      mutate(across(c(title, abstract), ~stringr::str_replace_all(., "\\s+|[Tt]extbackslash", " "))) %>% 
+      mutate(across(
+        c(title, abstract),
+        ~ stringr::str_replace_all(., "\\s+|[Tt]extbackslash", " ")
+      )) %>%
       # removes occurrences of \\n
-      mutate(across(c(title, abstract), ~stringr::str_replace_all(., stringr::fixed("\\\\n"), ""))) %>% 
+      mutate(across(
+        c(title, abstract),
+        ~ stringr::str_replace_all(., stringr::fixed("\\\\n"), "")
+      )) %>%
       # removes occurrences of double backslashes
-      mutate(across(c(title, abstract), ~stringr::str_replace_all(., stringr::fixed("\\\\"), "")))
+      mutate(across(
+        c(title, abstract),
+        ~ stringr::str_replace_all(., stringr::fixed("\\\\"), "")
+      ))
   )
-  
+
   return(df)
+}
+
+#' Extract and Clean Terms from SyRF Annotations
+#'
+#' This function processes a SyRF annotation dataframe to extract, clean, and
+#' standardize a list of terms from a specified annotation column. It is designed
+#' to handle semi-structured text where terms might be separated by various
+#' delimiters or grouped within brackets. The function performs several cleaning
+#' operations, removes stop words, and filters out very short terms to produce a
+#' clean term list. The final list is saved to a CSV file and returned as a
+#' character vector.
+#'
+#' @param annotation_df The syrf dataframe with annotation.
+#' @param annotated_column Column with the annotated content.
+#' @param res_filename Filename of result.
+#' @param file_path Folder where result should be saved.
+#'
+#' @return This returns  a list of cleaned terms and also saves it in a csv file
+#'
+#' @examples
+#' \dontrun{
+#' # Example usage:
+#' extract_term_syrf_annotation(
+#' annotation_df = syrf_df,
+#' annotated_column = "Collected.sample._48b9.a2b3.32eeeb0b43de_Answer",
+#' res_filename = "clean_term_list.csv")
+#' }
+#'
+#' @importFrom stringr str_extract_all str_remove_all str_replace_all str_trim str_split str_squish str_count str_to_lower
+#' @importFrom dplyr select mutate filter distinct
+#' @importFrom tidyr unnest
+#' @importFrom tidytext stop_words
+#' @export
+extract_term_syrf_annotation <- function(
+  annotation_df = NULL,
+  annotated_column = NULL,
+  res_filename = "term_list.csv",
+  file_path = NULL
+) {
+  # Input validation
+  if (!is.data.frame(annotation_df)) {
+    stop("annotation_df must be a data frame.")
+  }
+  if (!is.character(annotated_column) || length(annotated_column) != 1) {
+    stop("annotated_column must be a single column name as a string.")
+  }
+  if (!annotated_column %in% names(annotation_df)) {
+    stop(paste("Column", annotated_column, "not found in annotation_df."))
+  }
+
+  annotation <- annotation_df |>
+    select(
+      StudyId,
+      Answer = all_of(annotated_column)
+    )
+
+  # Clean and process the annotated text to extract individual biomarker terms
+  annotation_clean <- annotation |>
+    mutate(
+      # Extract terms within parentheses, brackets, or braces
+      bracket_terms = str_extract_all(
+        Answer,
+        "\\(([^()]+)\\)|\\[([^\\]]+)\\]|\\{([^{}]+)\\}"
+      ),
+      # Remove these terms from the main annotation string
+      Answer_no_brackets = str_remove_all(
+        Answer,
+        "\\(([^()]+)\\)|\\[([^\\]]+)\\]|\\{([^{}]+)\\}"
+      )
+    ) |>
+    unnest(bracket_terms, keep_empty = TRUE) |>
+    # Clean the extracted bracketed terms
+    mutate(
+      bracket_terms = str_replace_all(bracket_terms, "^\\(|\\)$", ""),
+      bracket_terms = str_replace_all(bracket_terms, "^\\[|\\]$", ""),
+      bracket_terms = str_replace_all(bracket_terms, "^\\{|\\}$", ""),
+      bracket_terms = str_trim(bracket_terms)
+    )
+
+  # Define a regex pattern to split terms separated by commas, semicolons, etc.
+  # Note: this includes language-specific conjunctions ("and", "or", "ou", "e", "end")
+  split_pattern <- paste0(
+    ",\\s*(and|or|ou|e|end)\\s*",
+    "|,\\s*",
+    "|;\\s*",
+    "|:\\s*",
+    "|\\\\",
+    "|\\b(and|or|ou|e|end)\\b",
+    "|\\([^)]+[,;\\\\|\\s]+[^)]+\\)",
+    "|\\[[^]]+[,;\\\\|\\s]+[^]]+\\]"
+  )
+
+  # Split the annotation text into individual terms
+  annotation_split <- annotation_clean |>
+    mutate(
+      terms = str_split(
+        Answer_no_brackets,
+        split_pattern,
+        simplify = FALSE
+      )
+    ) |>
+    unnest(terms) |>
+    # Clean and standardize the extracted terms
+    mutate(
+      terms = str_trim(terms),
+      terms = str_squish(terms),
+      terms = str_replace_all(terms, "^\\.|\\.$", ""),
+      terms = str_replace_all(terms, "\\s*-\\s*", "-"),
+      terms = str_replace_all(terms, "(?<=\\S)['](?=\\S|$)", ""),
+      terms = str_replace_all(terms, "^\\(|\\)$", "")
+    ) |>
+    # Re-integrate the terms found in brackets
+    mutate(
+      terms = ifelse(terms == "" & !is.na(bracket_terms), bracket_terms, terms),
+      terms = if_else(
+        !is.na(bracket_terms) & bracket_terms != terms,
+        paste(terms, bracket_terms, sep = "|||"),
+        terms
+      )
+    ) |>
+    separate_rows(terms, sep = "\\|\\|\\|") |>
+    # Filter out empty or meaningless entries
+    filter(terms != "", terms != ".", terms != "-") |>
+    distinct(StudyId, terms, .keep_all = TRUE)
+
+  # Further filter and tokenize the terms
+  token <- annotation_split |>
+    distinct(terms, .keep_all = TRUE) |>
+    mutate(terms_lower = str_to_lower(terms)) |>
+    # Note: stop_words are language specific (default is English)
+    filter(!terms_lower %in% tidytext::stop_words$word) |> # Remove stop words
+    mutate(nlength = str_count(terms)) |>
+    filter(!nlength < 2) # Remove very short terms
+
+  # Save the cleaned list of to a file
+  writeLines(
+    text = paste(token$terms, collapse = "\n"),
+    con = here::here(file_path, res_filename)
+  )
+
+  return(token$terms)
 }
