@@ -99,6 +99,9 @@ format_cols <- function(df) {
   # Subset columns that require title case
   title_case_cols <- c("author", "journal", "secondarytitle", "author_country", "author_affiliation")
   
+  sentence_case_cols <- c("title",
+                          "abstract")
+  
   # Subset columnns that require lower case
   lower_case_cols <- c(
     "uid", "doi", "keywords", "ptype",
@@ -111,6 +114,7 @@ format_cols <- function(df) {
   # Format correct letter case
   df <- df %>%
     select(all_of(x)) %>%
+    mutate(across(all_of(sentence_case_cols), ~stringr::str_to_sentence(.))) %>%
     mutate(across(all_of(lower_case_cols), ~ stringr::str_to_lower(.))) %>%
     mutate(across(all_of(title_case_cols), ~ stringr::str_to_title(.))) %>%
     # Add additional space after semi-colon
