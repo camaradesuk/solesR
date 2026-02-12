@@ -554,11 +554,12 @@ process_wos <- function(path) {
 #' @import dplyr
 #' @import ASySD
 process_pubmed <- function(path) {
+  
   # Extract file extension
   file_extension <- tools::file_ext(path)
   
   # Check file extension
-  if (!file_extension %in% c("ris", "bib")) {
+  if (!file_extension %in% c("ris", "bib", "txt")) {
     stop(message("Error: File type not supported"))
   }
   
@@ -566,7 +567,22 @@ process_pubmed <- function(path) {
   newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format = "pubmed")
   
   # Get column names
-  lookup_table <- setNames(ASySD::field_codes_pubmed$Field, ASySD::field_codes_pubmed$Abbreviation)
+  fc <- ASySD::field_codes_pubmed
+  
+  # Add article_ids to the field codes
+  new_row <- data.frame(
+    Abbreviation = "AID",
+    `Long Name`  = "Article ID",
+    Field        = "article_ids",
+    Conversion   = "PubMed",
+    check.names  = FALSE,
+    stringsAsFactors = FALSE
+  )
+  
+  field_codes <- rbind(fc, new_row)
+  
+  lookup_table <- setNames(field_codes$Field, field_codes$Abbreviation)
+  
   colnames(newdat) <- lookup_table[colnames(newdat)]
   
   # Remove columns that are blank
@@ -585,26 +601,16 @@ process_pubmed <- function(path) {
   
   # Create unique identifiers
   newdat <- newdat %>%
-    dplyr::mutate(
-      uid = paste0("pubmed-", record_id),
-      pmid = record_id,
-      doi = ifelse(
-        !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
-        stringr::str_extract(article_ids, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
-        doi
-      ),
-      doi = ifelse(
-        !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
-        stringr::str_extract(local_identifier, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
-        doi
-      )
-    )
+    mutate(uid = paste0("pubmed-", record_id)) %>%
+    mutate(pmid = record_id) %>%
+    mutate(doi = ifelse(is.na(doi), stringr::str_extract(article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), doi))
   
   # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
   
   # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
+  
   
   # Return processed dataframe
   return(newdat)
@@ -646,7 +652,6 @@ process_scopus <- function(path) {
   # Read in data using synthesr package
   newdat <- synthesisr::read_refs(path, tag_naming = "scopus")
   
-  # browser()
   # Rename issue as number
   newdat$number <- newdat$issue
   
