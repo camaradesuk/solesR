@@ -749,6 +749,7 @@ process_wos <- function(path){
 #' @importFrom stringr str_extract
 #' @import dplyr
 process_pubmed <- function(path){
+  
   # try wos format
   newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format="pubmed")
   
@@ -777,9 +778,14 @@ process_pubmed <- function(path){
       ),
       doi = ifelse(
         !stringr::str_detect(doi, "^10\\.\\d{4,9}/\\S+"),
-        stringr::str_extract(local_identifier, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        stringr::str_extract(local_id, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
         doi
-      )
+      ),
+      doi = ifelse(
+        is.na(doi),
+        stringr::str_extract(source_2, "(?<=DOI:\\s)10\\.\\d{4,}/\\S+"),
+        doi
+        ),
     )
   
   newdat <- format_doi(newdat)
