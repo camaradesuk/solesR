@@ -25,7 +25,7 @@ scopus_search <- function(query, api_key, retMax=2000){
 }
 
 #' Get Web of Science results
-#' This function retrieves search results from pubmed	#' This function retrieves search results from Web of Science, using the WOS Lite API. A personal API key 
+#' This function retrieves search results from Web of Science, using the WOS Lite API. A personal API key 
 #' must be requested from the Clarivate developer portal (https://developer.clarivate.com/apis/woslite) 
 #' and stored as an R Environment variable.
 #' 
