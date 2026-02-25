@@ -493,7 +493,8 @@ process_wos <- function(path) {
     # read in 
     newdat <- bibliometrix::convert2df(path, dbsource = "wos", format="bibtex")
 
-    # Get column names
+    # Use lookup tables for naming
+    utils::data("field_codes", package = "solesR", envir = environment())
     lookup_table <- setNames(field_codes_wos$Field, field_codes_wos$Abbreviation)
     colnames(newdat) <- lookup_table[colnames(newdat)]
     
@@ -559,7 +560,8 @@ process_pubmed <- function(path){
   # try wos format
   newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format="pubmed")
   
-  # sort out naming
+  # use lookup tables for naming
+  utils::data("field_codes", package = "solesR", envir = environment())
   lookup_table <- setNames(field_codes_pubmed$Field, field_codes_pubmed$Abbreviation)
   colnames(newdat) <- lookup_table[colnames(newdat)]
   
@@ -640,6 +642,7 @@ process_scopus <- function(path) {
   newdat <- bibliometrix::convert2df(path, dbsource = "scopus", format="csv")
   
   # Bring in data from lookup tables
+  utils::data("field_codes", package = "solesR", envir = environment())
   lookup_table <- setNames(field_codes_scopus$Field, field_codes_scopus$Abbreviation)
   colnames(newdat) <- lookup_table[colnames(newdat)]
   
