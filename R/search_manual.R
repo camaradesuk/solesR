@@ -424,7 +424,7 @@ process_wos <- function(path) {
   
   # Check file extension
   if (file_extension %in% c("ris")) {
-    # Extract data
+    # Pull in data
     newdat <- synthesisr::read_refs(path, tag_naming = "ovid")
     
     # If start and end page give, combine both
@@ -490,7 +490,7 @@ process_wos <- function(path) {
     
   } else if (file_extension %in% c("bib")) {
     
-    # read in 
+    # Pull in data
     newdat <- bibliometrix::convert2df(path, dbsource = "wos", format="bibtex")
 
     # Use lookup tables for naming
@@ -557,7 +557,15 @@ process_wos <- function(path) {
 #' @import dplyr
 process_pubmed <- function(path){
   
-  # try wos format
+  # Extract file extension
+  file_extension <- tools::file_ext(path)
+  
+  # # Check file extension
+  if (!file_extension %in% c("txt", "bib")) {
+    stop(message("Error: File type not supported, csv required from scopus"))
+  }
+  
+  # Pull in data
   newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format="pubmed")
   
   # use lookup tables for naming
@@ -639,6 +647,7 @@ process_scopus <- function(path) {
     stop(message("Error: File type not supported, csv required from scopus"))
   }
   
+  # Pull in data
   newdat <- bibliometrix::convert2df(path, dbsource = "scopus", format="csv")
   
   # Bring in data from lookup tables
