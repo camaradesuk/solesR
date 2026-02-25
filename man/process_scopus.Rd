@@ -2,24 +2,24 @@
 % Please edit documentation in R/search_manual.R
 \name{process_scopus}
 \alias{process_scopus}
-\title{Process Manually Uploaded Search results from Scopus}
+\title{Process Manually Downloaded Scopus Search Results}
 \usage{
 process_scopus(path)
 }
 \arguments{
-\item{path}{the file path to the search results}
+\item{path}{Character scalar. File path to a Scopus CSV export.}
 }
 \value{
-a processed dataframe containing search results
+A processed data.frame containing harmonised Scopus search results.
 }
 \description{
-Internal function used to process Scopus search results an format for SOLES.
+Internal function used to import and standardise Scopus search results
+for use within SOLES.
 }
 \details{
-This function reads references from the specified file using the "ovid" tag naming convention.
-It performs various transformations on the data, such as uniting title and booktitle columns,
-formatting pages, creating a unique identifier (uid) based on the Scopus EID, and setting
-the data source to "scopus". Additionally, it prints the values of the article_id column.
+This function reads a Scopus CSV export using
+\code{bibliometrix::convert2df()} and converts it into the standardised
+SOLES structure.
 }
 \examples{
 \dontrun{

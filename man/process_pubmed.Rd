@@ -16,15 +16,16 @@ a processed dataframe containing search results
 Internal function used to process PubMed search results an format for SOLES.
 }
 \details{
-This function reads references from the specified file in PubMed format using the "pubmed" database source.
+This function reads references from the .nbib pubmed export (send to > citation manager > file.nbib) OR the PubMed text export (save > PubMed -> file.txt) You can access this by selecting "send to reference manager" for up to 10,000 records.
 It adjusts column names according to the field codes, removes blank columns, adds source information,
-creates a unique identifier (uid) based on the record_id, sets the data source to "pubmed", and
+creates a unique identifier (uid) based on the pmid, sets the data source to "pubmed", and
 formats the doi column based on available information.
 }
 \examples{
 \dontrun{
 # Example usage:
 pubmed_data <- process_pubmed("path/to/pubmed_data.bib")
+pubmed_data <- process_pubmed("path/to/pubmed_data.txt")
 }
 
 }
