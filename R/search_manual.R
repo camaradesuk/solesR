@@ -99,8 +99,6 @@ format_cols <- function(df) {
   # Subset columns that require title case
   title_case_cols <- c("author", "journal", "secondarytitle", "author_country", "author_affiliation")
   
-  sentence_case_cols <- c("title",
-                          "abstract")
   
   # Subset columnns that require lower case
   lower_case_cols <- c(
@@ -114,7 +112,6 @@ format_cols <- function(df) {
   # Format correct letter case
   df <- df %>%
     select(all_of(x)) %>%
-    mutate(across(all_of(sentence_case_cols), ~stringr::str_to_sentence(.))) %>%
     mutate(across(all_of(lower_case_cols), ~ stringr::str_to_lower(.))) %>%
     mutate(across(all_of(title_case_cols), ~ stringr::str_to_title(.))) %>%
     # Add additional space after semi-colon
@@ -490,17 +487,14 @@ process_wos <- function(path) {
     
     # Run format columns function to ensure columns are consistent and compatible for SOLES
     newdat <- format_cols(newdat)
+    
   } else if (file_extension %in% c("bib")) {
-    # Read data using bibliometrix package
-    newdat <- bibliometrix::convert2df(path, dbsource = "wos", format = "bibtex")
     
-    # Read in field codes from ASySD
-    field_codes <- rbind(
-      ASySD::field_codes_wos %>% dplyr::select(Abbreviation, Field),
-      data.frame(Abbreviation = "UT", Field = "uid"))
-    
+    # read in 
+    newdat <- bibliometrix::convert2df(path, dbsource = "wos", format="bibtex")
+
     # Get column names
-    lookup_table <- setNames(field_codes$Field, field_codes$Abbreviation)
+    lookup_table <- setNames(field_codes_wos$Field, field_codes_wos$Abbreviation)
     colnames(newdat) <- lookup_table[colnames(newdat)]
     
     # Remove columns that are blank
@@ -513,8 +507,11 @@ process_wos <- function(path) {
     
     # Create unique identifier
     newdat$uid <- gsub("WOS:", "wos:", newdat$uid)
-    
     newdat$uid <- lapply(newdat$uid, function(x) gsub("WOS", "wos:", x))
+    
+    # Format author country
+    newdat$author_country <- stringr::str_extract(newdat$author_country, "\\b(\\w+)\\b$")
+    newdat$author_country  <- tools::toTitleCase(newdat$author_country)
     
     # Rename publication type column
     newdat$ptype <- newdat$article_type
@@ -541,73 +538,62 @@ process_wos <- function(path) {
 #' @return a processed dataframe containing search results
 #'
 #' @details
-#' This function reads references from the specified file in PubMed format using the "pubmed" database source.
-#' It adjusts column names according to the field codes, removes blank columns, adds source information,
-#' creates a unique identifier (uid) based on the record_id, sets the data source to "pubmed", and
+#' This function reads references from the .nbib pubmed export (send to > citation manager > file.nbib) OR the PubMed text export (save > PubMed -> file.txt) You can access this by selecting "send to reference manager" for up to 10,000 records.  
+#' It adjusts column names according to the field codes, removes blank columns, adds source information, 
+#' creates a unique identifier (uid) based on the pmid, sets the data source to "pubmed", and 
 #' formats the doi column based on available information.
 #'
 #' @examples
 #' \dontrun{
 #' # Example usage:
 #' pubmed_data <- process_pubmed("path/to/pubmed_data.bib")
+#' pubmed_data <- process_pubmed("path/to/pubmed_data.txt")
 #' }
 #'
 #' @importFrom bibliometrix convert2df
 #' @importFrom tidyr unite
 #' @importFrom stringr str_extract
 #' @import dplyr
-#' @import ASySD
-process_pubmed <- function(path) {
+process_pubmed <- function(path){
   
-  # Extract file extension
-  file_extension <- tools::file_ext(path)
+  # try wos format
+  newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format="pubmed")
   
-  # Check file extension
-  if (!file_extension %in% c("ris", "bib", "txt")) {
-    stop(message("Error: File type not supported"))
-  }
-  
-  # Read in data using bibliometrix
-  newdat <- bibliometrix::convert2df(path, dbsource = "pubmed", format = "pubmed")
-  
-  # Get column names
-  fc <- ASySD::field_codes_pubmed
-  
-  # Add article_ids to the field codes
-  new_row <- data.frame(
-    Abbreviation = "AID",
-    `Long Name`  = "Article ID",
-    Field        = "article_ids",
-    Conversion   = "PubMed",
-    check.names  = FALSE,
-    stringsAsFactors = FALSE
-  )
-  
-  field_codes <- rbind(fc, new_row)
-  
-  lookup_table <- setNames(field_codes$Field, field_codes$Abbreviation)
-  
+  # sort out naming
+  lookup_table <- setNames(field_codes_pubmed$Field, field_codes_pubmed$Abbreviation)
   colnames(newdat) <- lookup_table[colnames(newdat)]
   
-  # Remove columns that are blank
+  # remove columns that are blank
   keep.cols <- names(newdat) %in% NA
-  newdat <- newdat[!keep.cols]
+  newdat <- newdat [! keep.cols]
   rownames(newdat) <- 1:nrow(newdat)
   
-  # Set source
   newdat$source <- "pubmed"
-  
-  # Fix column names for keywords
   colnames(newdat) <- gsub("^keywords_plus.*$", "keywords_plus", colnames(newdat))
-  
-  # Rename publication type
   newdat$ptype <- newdat$document_type
   
-  # Create unique identifiers
+  # DOI repair: keep valid DOI; otherwise try extracting from known fields (txt/nbib)
+  doi_valid <- "^10\\.\\d{4,9}/\\S+"
+  
   newdat <- newdat %>%
-    mutate(uid = paste0("pubmed-", record_id)) %>%
-    mutate(pmid = record_id) %>%
-    mutate(doi = ifelse(is.na(doi), stringr::str_extract(article_ids, "\\b10\\.\\d{4,}\\/[\\S]+(?=\\s\\[DOI\\])"), doi))
+    dplyr::mutate(
+      uid  = paste0("pubmed-", pmid),
+      
+      # keep doi only if it already looks valid; otherwise set NA so coalesce can fill it
+      doi = dplyr::if_else(
+        stringr::str_detect(doi, doi_valid),
+        doi,
+        NA_character_
+      ),
+      
+      # fill from the first available extraction
+      doi = dplyr::coalesce(
+        doi,
+        stringr::str_extract(article_ids, "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        stringr::str_extract(local_id,   "\\b10\\.\\d{4,}/\\S+(?=\\s\\[DOI\\])"),
+        stringr::str_extract(source_2,   "(?<=DOI:\\s)10\\.\\d{4,}/\\S+")
+      )
+    )
   
   # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
@@ -616,23 +602,22 @@ process_pubmed <- function(path) {
   newdat <- format_cols(newdat)
   
   
-  # Return processed dataframe
   return(newdat)
 }
 
-#' Process Manually Uploaded Search results from Scopus
+#' Process Manually Downloaded Scopus Search Results
 #'
-#' Internal function used to process Scopus search results an format for SOLES.
+#' Internal function used to import and standardise Scopus search results
+#' for use within SOLES.
 #'
-#' @param path the file path to the search results
+#' @param path Character scalar. File path to a Scopus CSV export.
 #'
-#' @return a processed dataframe containing search results
+#' @return A processed data.frame containing harmonised Scopus search results.
 #'
 #' @details
-#' This function reads references from the specified file using the "ovid" tag naming convention.
-#' It performs various transformations on the data, such as uniting title and booktitle columns,
-#' formatting pages, creating a unique identifier (uid) based on the Scopus EID, and setting
-#' the data source to "scopus". Additionally, it prints the values of the article_id column.
+#' This function reads a Scopus CSV export using
+#' \code{bibliometrix::convert2df()} and converts it into the standardised
+#' SOLES structure.
 #'
 #' @examples
 #' \dontrun{
@@ -640,7 +625,6 @@ process_pubmed <- function(path) {
 #' scopus_data <- process_scopus("path/to/scopus_data.csv")
 #' }
 #'
-#' @importFrom synthesisr read_refs
 #' @importFrom tidyr unite
 #' @import dplyr
 process_scopus <- function(path) {
@@ -649,107 +633,70 @@ process_scopus <- function(path) {
   file_extension <- tools::file_ext(path)
   
   # # Check file extension
-  if (!file_extension %in% c("ris", "bib", "txt", "csv")) {
-    stop(message("Error: File type not supported"))
+  if (!file_extension %in% c("csv")) {
+    stop(message("Error: File type not supported, csv required from scopus"))
   }
   
-  # Read in data using synthesr package
-  newdat <- synthesisr::read_refs(path, tag_naming = "scopus")
+  newdat <- bibliometrix::convert2df(path, dbsource = "scopus", format="csv")
   
-  # Rename issue as number
-  newdat$number <- newdat$issue
+  # Bring in data from lookup tables
+  lookup_table <- setNames(field_codes_scopus$Field, field_codes_scopus$Abbreviation)
+  colnames(newdat) <- lookup_table[colnames(newdat)]
   
-  # Set author affiliation column
-  if ("address" %in% colnames(newdat)) {
-    newdat$author_affiliation <- newdat$address
-  } else if ("affiliations" %in% colnames(newdat)) {
-    newdat$author_affiliation <- newdat$affiliations
-  }
+  # remove columns that are blank
+  keep.cols <- names(newdat) %in% NA
+  newdat <- newdat [! keep.cols]
+  rownames(newdat) <- 1:nrow(newdat)
   
-  # Reanme source as journal
-  if ("source" %in% colnames(newdat) &
-      isFALSE(grepl("scopus", newdat$source, ignore.case = T))) {
-    newdat$journal <- newdat$source
-  } else if ("source_title" %in% colnames(newdat)) {
-    newdat$journal <- newdat$source_title
-  }
-  
-  # Rename publication type
-  if ("source_type" %in% colnames(newdat)) {
-    newdat$ptype <- newdat$source_type
-  } else if ("document_type" %in% colnames(newdat)) {
-    newdat$ptype <- newdat$document_type
-  }
-  
-  # If book, use booktitle in title
-  if ("booktitle" %in% colnames(newdat)) {
-    newdat <- newdat %>%
-      tidyr::unite(title, booktitle, na.rm = TRUE)
-  }
-  
-  # If start and end pages both given, combine
-  if ("start_page" %in% colnames(newdat) &
-      "end_page" %in% colnames(newdat)) {
-    newdat <- newdat %>%
-      tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE)
-  } else if ("page_start" %in% colnames(newdat) &
-             "page_end" %in% colnames(newdat)) {
-    newdat <- newdat %>%
-      tidyr::unite(pages, page_start, page_end, sep = "-", na.rm = TRUE)
-  } else {
-    # Else use only start page
-    newdat <- newdat %>%
-      mutate(pages = start_page)
-  }
-  
-  # Set date as today's date
-  newdat$date <- format(Sys.Date(), "%d%m%y")
-  
-  # If no identifier given, set as NA
-  if (!"article_id" %in% colnames(newdat)) {
-    newdat <- newdat %>%
-      mutate(article_id = NA)
-  }
-  
-  # Rename link to url
-  if (!"url" %in% colnames(newdat) &
-      "link" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(url = link)
-  }
-  
-  # Get pattern for unique identifiers
-  pattern <- "eid=(2-s2\\.0-\\d+)"
-  
-  # Create unique identifier
-  newdat <- newdat %>%
-    ungroup() %>%
-    mutate(uid = ifelse(!is.na(url), stringr::str_extract(url, pattern),
-                        paste0("unknown-accession-", floor(runif(n(), min = 100, max = 10000000)))
-    )) %>%
-    dplyr::mutate(uid = gsub("eid=", "", uid)) %>%
-    dplyr::mutate(pmid = pubmed_id) %>%
-    dplyr::mutate(uid = paste0("scopus-", uid))
-  
-  # Set source
+  # tidy columns
   newdat$source <- "scopus"
+  colnames(newdat) <- gsub("^keywords_plus.*$", "keywords_plus", colnames(newdat))
+  newdat$ptype <- newdat$document_type
   
-  # Format author column
-  if (!"author" %in% colnames(newdat) &
-      "authors" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(author = authors)
+  # create pages column
+  if (all(c("start_page", "end_page") %in% colnames(newdat))) {
+    
+    newdat <- newdat %>%
+      tidyr::unite(pages, start_page, end_page, sep = "-", na.rm = TRUE) %>%
+      mutate(
+        pages = trimws(pages),
+        pages = na_if(pages, ""),
+        pages = na_if(pages, "-")
+      )
+    
+  } else if ("start_page" %in% colnames(newdat)) {
+    
+    newdat <- newdat %>%
+      mutate(
+        pages = na_if(trimws(start_page), "")
+      )
   }
   
-  # Format keywords column
-  if (!"keywords" %in% colnames(newdat) &
-      "author_keywords" %in% colnames(newdat)) {
-    newdat <- newdat %>% rename(keywords = author_keywords)
-  }
+  # create scopus uid
+  pattern <- "eid=(2-s2\\.0-\\d+)"
+  newdat <- newdat %>%
+    mutate(
+      uid = dplyr::case_when(
+        !is.na(accession_number) & stringr::str_trim(accession_number) != "" ~ accession_number,
+        !is.na(link)      & stringr::str_trim(link)      != "" ~ stringr::str_extract(link, pattern),
+        TRUE ~ paste0("unknown-accession-", floor(runif(n(), 100, 10000000)))
+      ),
+      uid = gsub("eid=", "", uid),
+      uid = paste0("scopus-", uid)
+    )
   
   # Run format DOI function to ensure DOIs are consistently formatted
   newdat <- format_doi(newdat)
   
   # Run format columns function to ensure columns are consistent and compatible for SOLES
   newdat <- format_cols(newdat)
+  
+  # add NAs in empty cells
+  newdat <- newdat %>% 
+    mutate(across(
+      where(is.character),
+      ~ na_if(trimws(.), "")
+    ))
   
   # Return processed dataframe
   return(newdat)
