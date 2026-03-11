@@ -302,3 +302,248 @@ get_missing_dois <- function(citations){
   # Return citations
   return(citations)
 }
+
+#' Retrieve Missing DOIs for Included Citations
+#'
+#' This function identifies included citations in the database with no DOI information, 
+#' then retrieves DOIs using the OpenAlex API. Results are processed in batches with rate limiting and saved to disk.
+#'
+#' @param con A database connection object (e.g., from DBI::dbConnect).
+#' @param batch_size Integer. Number of citations to process per batch. Default is 100.
+#'   Batches are processed with a 2-minute delay between them to respect API rate limits.
+#' @param study_type String. Type of study, based on the name column in study_classification table (i.e. "in-vivo", "clinical" etc)
+#'
+#' @return A data frame containing citations with successfully retrieved DOIs, or NULL
+#'   if no DOIs are missing or none are found
+#'
+#' The function expects the database to contain:
+#' \itemize{
+#'   \item \code{study_classification} table with \code{uid} and \code{decision} columns
+#'   \item \code{unique_citations} table with \code{uid}, \code{doi}, and \code{title} columns
+#' }
+#'
+#' @section Output Files:
+#' Results are saved to \code{doi_retrieval/doi_found_YYYY-MM-DD.fst} where the date
+#' reflects when the function was run.
+#'
+#' @section API Usage:
+#' This function uses the OpenAlex API via \code{solesR::get_missing_dois()}. The
+#' 2-minute delay between batches helps ensure compliance with API rate limits.
+#'
+#' @examples
+#' \dontrun{
+#' # Use smaller batches for more conservative API usage
+#' doi_results <- get_missing_dois_complete(con, batch_size = 50)
+#' }
+#' @seealso
+#' \code{\link[solesR]{get_missing_dois}}
+#'
+#' @export
+get_missing_dois_complete <- function(con, batch_size = 100, study_type = NULL) {
+  
+  # Create output directory
+  fst_dir <- "doi_retrieval"
+  if (!dir.exists(fst_dir)) {
+    dir.create(fst_dir, recursive = TRUE)
+  }
+  
+  # Dated file name
+  date <- Sys.Date()
+  dated_fst_file <- file.path(fst_dir, paste0("doi_found_", date, ".fst"))
+  
+  if (is.null(study_type)){
+    
+    # Find citations missing DOIs
+    citations_no_doi <- tbl(con, "study_classification") %>%
+      filter(decision == "include") %>%
+      select(uid) %>%
+      left_join(tbl(con, "unique_citations"), by = "uid") %>%
+      collect() %>%
+      filter(is.na(doi) | doi == "", !title %in% c("Preface", "Foreword"))
+  } else{
+    
+    citations_no_doi <- tbl(con, "study_classification") %>%
+      filter(decision == "include") %>%
+      filter(name == study_type) %>% 
+      select(uid) %>%
+      left_join(tbl(con, "unique_citations"), by = "uid") %>%
+      collect() %>%
+      filter(is.na(doi) | doi == "", !title %in% c("Preface", "Foreword"))
+    
+  }
+  
+  # Check there are DOI missing
+  if (nrow(citations_no_doi) == 0) {
+    message("No DOIs missing")
+    return()
+  } else {
+    message(paste0("Total number of DOIs to search for: ", nrow(citations_no_doi)))
+  }
+  
+  # Split into batches
+  batches <- split(citations_no_doi, ceiling(seq_len(nrow(citations_no_doi)) / batch_size))
+  
+  # Process each batch and store results in a list
+  results_list <- lapply(seq_along(batches), function(i) {
+    batch <- batches[[i]]
+    start_idx <- (i - 1) * batch_size + 1
+    end_idx <- start_idx + nrow(batch) - 1
+    
+    # Fetch DOIs for this batch
+    message(sprintf("DOIs found for citations %d-%d", start_idx, end_idx))
+    result <- get_missing_dois(batch)
+    
+    # Sleep between batches (but not after the last one)
+    if (i < length(batches)) {
+      message("Waiting 2 minutes before next batch...")
+      Sys.sleep(120)
+    }
+    
+    # Return only if result is not NULL/empty
+    if (!is.null(result) && nrow(result) > 0) {
+      return(result)
+    } else {
+      return(NULL)
+    }
+  })
+  
+  if (length(results_list) == 0) {
+    message("No new DOIs found in this run.")
+    return()
+  }
+  
+  # Bind all results
+  all_citations_with_doi <- do.call(rbind, results_list)
+  
+  # Make sure only 1 DOI returned for each UID
+  all_doi_found <- all_citations_with_doi 
+  
+  # Use soles function to format the doi
+  all_doi_found <- solesR::format_doi(all_doi_found) %>% 
+    filter(!is.na(doi) & doi != "") %>% 
+    select(uid, doi) %>% 
+    distinct()
+  
+  # Save and return only DOIs found
+  write.fst(all_doi_found, dated_fst_file)
+  message(paste0("Total DOI searched for: ", nrow(citations_no_doi)))
+  message(paste0("Total DOI found: ", nrow(all_doi_found)))
+  message("All DOIs saved to: ", dated_fst_file)
+  
+  return(all_doi_found)
+}
+
+#' Process and Update Found DOIs in the Database
+#'
+#' Imports newly identified DOIs from a `.fst` file, from the get_missing_dois_complete() function,
+#' and updates matching records in the `unique_citations` table based on `uid`.
+#'
+#' The function checks alignment between supplied DOIs and database records
+#' missing a DOI. If counts do not match, the user is prompted to either proceed
+#' with automated updating or exit for manual inspection.
+#'
+#' When confirmed, existing DOI values for matching UIDs are replaced, all other
+#' records are left unchanged, and the full `unique_citations` table is written
+#' back to the database.
+#'
+#' @param con A database connection object (e.g., from \code{DBI::dbConnect})
+#'   pointing to a database containing the \code{unique_citations} table.
+#' @param dois_found_file Path to a `.fst` file containing at least the columns
+#'   \code{uid} and \code{doi}.
+#'
+#' @return Invisibly returns \code{NULL}. Updates the \code{unique_citations} table.
+#'
+#' @examples
+#' \dontrun{
+#' process_found_doi(con, "doi_retrieval/doi_found_date.fst")
+#' }
+#'
+#' @importFrom fst read.fst
+#' @importFrom dplyr select distinct filter left_join
+#' @importFrom DBI dbWriteTable
+#'
+#' @export
+process_found_doi <- function(con, dois_found_file = NULL) {
+  
+  # Check for valid file path
+  if (missing(dois_found_file) || !file.exists(dois_found_file)) {
+    stop("Please provide a valid path to a doi_found file (.fst).")
+  }
+  
+  
+  # Bring in DOI found file
+  dois_found <- fst::read.fst(dois_found_file) 
+  
+  # If UID == NA then exit function
+  if (any(is.na(dois_found$uid))) {
+    stop("UID column contains NA values — cannot safely process DOIs.")
+  }
+  
+  message(paste("Processing", nrow(dois_found), "DOIs from the doi_found file..."))
+  
+  # Search unique_citations for these studies
+  studies_found <- tbl(con, "unique_citations") %>% 
+    filter(uid %in% dois_found$uid) %>% 
+    collect()
+  
+  # Check they are still missing a DOI
+  studies_found_no_doi <- studies_found %>% 
+    filter(is.na(doi) | doi == "") 
+  
+  message(paste("Number of linked studies in the database:", nrow(studies_found)))
+  message(paste("Number of linked studies in the database missing a DOI:", nrow(studies_found_no_doi)))
+  
+  
+  
+  # If they do not match up exactly then tell the user
+  if (nrow(dois_found) != nrow(studies_found_no_doi)){
+    
+    answer <- menu(
+      c("Yes", "No, check manually"),
+      title = paste0("Number of new DOIs for processing differs to the number of linked studies in the database. Meaning possible duplicate DOIs or UIDs.",
+                     "\n",
+                     "Would you like to continue automated processing?")
+    )
+    
+    if (answer == 2){
+      message("Manual check required — exiting function.")
+      return(invisible(NULL))
+    }
+  } else {
+    
+    # If they do match up, then confirm with the user to update the database table
+    answer <- menu(
+      c("Yes", "No"),
+      title = paste0("Number of new DOIs for processing matches the number of linked studies in the database.",
+                     "\n",
+                     "Would you like to update the unique_citations table?")
+    )
+    
+    if (answer == 2){
+      message("Database not updated - exiting function.")
+      return(invisible(NULL))
+    }
+    
+  }
+  
+  message(paste("Updating unique_citations tables with", nrow(studies_found), "new DOIs found..."))
+  
+  # Remove the studies which are NOT to be updated
+  remove_found <- tbl(con, "unique_citations") %>% 
+    filter(!uid %in% dois_found$uid) %>% 
+    collect()
+  
+  # Update the found studies
+  updated_studies <- studies_found %>% 
+    select(-doi) %>% 
+    left_join(dois_found, by = "uid")
+  
+  # Put them back together
+  unique_citations <- rbind(remove_found, updated_studies)
+  
+  # Write to database
+  dbWriteTable(con, "unique_citations", unique_citations, overwrite = T)
+  
+  message("unique_citations table updated successfully.")
+  
+}

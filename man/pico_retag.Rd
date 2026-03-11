@@ -24,9 +24,11 @@ Default is \code{"both"}.}
 The function updates the \code{pico_tag} table in the database.
 }
 \description{
-A function to update your pico tags when changes to the pico dictionary have been made. This function
-uses the \code{complete_pico_tag()} and may take a long time to run. It is therefore recommended to schedule
-it as a background process.
+Re-tag studies in the database based on a PICO tag type. This function updates the
+\code{pico_tag} table by removing existing tags of the specified type and applying new tags
+using the selected method. This function uses \code{complete_pico_tag()} internally
+and may take a long time to run. Consider scheduling it as a background process. If you want to retag
+using the most up-to-date PICO dictionary, run \code{check_pico()} before running this function.
 }
 \examples{
 \dontrun{

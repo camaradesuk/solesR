@@ -28,22 +28,22 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
   if (is.null(query)) {
     stop(message("Error: you have not entered a search query"))
   }
-
+  
   # Check for API key and exit if NULL
   if (is.null(api_key)) {
     stop(message("Error: you have not entered an API key"))
   }
-
+  
   # Check if retMax is a positive integer and exit if not
   if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
     stop(message("Error: retMax is not a whole number"))
   }
-
+  
   # Check retMax and exit if above maximum
   if (retMax > 5000) {
     stop(message("Error: retMax is too high"))
   }
-
+  
   # Check format_soles is boolean and exit if not
   if (is.logical(format_soles) == FALSE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
@@ -84,10 +84,10 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
   
   # Append timespan to user query to define final query
   full_query <- paste0("(", query, ") AND ORIG-LOAD-DATE > ", min_date_char)
-
+  
   # Print message
   message("Running Scopus search...")
-
+  
   # Try running search query using scopusAPI R package
   scopus_results <- tryCatch(
     {
@@ -103,10 +103,10 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
       stop("Error in calling scopusAPI::search_scopus()", conditionMessage(e))
     }
   )
-
+  
   # Return results if successful
-  message("Retrieved ", nrow(scopus_results), "records from Scopus")
-
+  message("Retrieved ", nrow(scopus_results), " records from Scopus")
+  
   # Format for SOLES workflow if format_soles == TRUE
   if (format_soles == TRUE) {
     # Print message
@@ -120,20 +120,20 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
     # Print message
     message("Formatted!")
   }
-
+  
   # Change no abstract available to NA
   scopus_results$abstract <- gsub("^\\[No abstract available\\]$", "", scopus_results$abstract)
   # Change all "NA" to real NA
   scopus_results[scopus_results == "NA"] <- NA
   # Change all blanks to NA
   scopus_results[scopus_results == ""] <- NA
-
+  
   # Make DOI lowercase
   scopus_results$doi <- tolower(scopus_results$doi)
   
   # Remove any additional DOIs (e.g., elife versioning)
   scopus_results$doi <- gsub("; .+$", "", scopus_results$doi)
-
+  
   # Return search results
   return(scopus_results)
 }
@@ -164,25 +164,26 @@ scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax 
 #'
 
 wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
+  
   # Check for query and exit if NULL
   if (is.null(query)) {
     stop(message("Error: you have not entered a search query"))
   }
-
+  
   # Check for API key and exit if NULL
   if (is.null(timespan)) {
     stop(message("Error: you have not entered a timespan for the search"))
   }
-
+  
   # Check format_soles is boolean and exit if not
   if (is.logical(format_soles) == FALSE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
   }
-
+  
   if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
-
+  
   # Define timespan for search
   if (grepl("(?i)week", timespan) == TRUE) {
     # Get number of weeks by removing non-digit characters
@@ -203,16 +204,16 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     # Print search dates
     message("Searching from ", min_date_char, " to ", max_date_char)
   }
-
+  
   # Append timespan to user query to define final query
   full_query <- paste0("(", query, ") AND LD=(", min_date_char, "/", max_date_char, ")")
-
+  
   # Set database to search as "WOS"
   database <- "WOS"
-
+  
   # Print message
   message("Running Web of Science Core Collection search...")
-
+  
   # Try seeing how many records are captured by query
   n_records <- tryCatch(
     {
@@ -224,12 +225,14 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
       stop("Error in calling rwoslite::wos_search()", conditionMessage(e))
     }
   )
-
+  
   # Exit function if number of records is 0
   if (n_records == 0) {
-    stop(message("Error: no search results were found from query: ", query))
+    message("No search results were found from query.")
+    return(data.frame())
+    
   }
-
+  
   # Try running search query using rwoslite R package
   wos_results <- tryCatch(
     {
@@ -241,10 +244,10 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
       stop("Error in calling rwoslite::search_wos()", conditionMessage(e))
     }
   )
-
+  
   # Return results if successful
   message("Retrieved ", nrow(wos_results), " records from Web of Science Core Collection")
-
+  
   # Format for SOLES workflow if format_soles == TRUE
   if (format_soles == TRUE) {
     # Print message
@@ -277,20 +280,20 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     # Print message
     message("Formatted!")
   }
-
+  
   # Change no abstract available to NA
   wos_results$abstract <- gsub("^\\[No abstract available\\]$", "", wos_results$abstract)
   # Change all "NA" to real NA
   wos_results[wos_results == "NA"] <- NA
   # Change all blanks to NA
   wos_results[wos_results == ""] <- NA
-
+  
   # Make DOI lowercase
   wos_results$doi <- tolower(wos_results$doi)
   
   # Remove any additional DOIs (e.g., elife versioning)
   wos_results$doi <- gsub("; .+$", "", wos_results$doi)
-
+  
   # Return search results
   return(wos_results)
 }
@@ -319,35 +322,36 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
 #' @export
 #'
 pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
+  
   # Check for query and exit if NULL
   if (is.null(query)) {
     stop(message("Error: you have not entered a search query"))
   }
-
+  
   # Check for API key and exit if NULL
   if (is.null(timespan)) {
     stop(message("Error: you have not entered a timespan for the search"))
   }
-
+  
   # Check format_soles is boolean and exit if not
   if (is.logical(format_soles) == FALSE) {
     stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
   }
-
+  
   # Check if retMax is a positive integer and exit if not
   if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
     stop(message("Error: retMax is not a whole number"))
   }
-
+  
   # Check retMax and exit if above maximum
   if (retMax > 5000) {
     stop(message("Error: retMax is too high"))
   }
-
+  
   if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
     stop(message("Error: timespan format incorrect"))
   }
-
+  
   # Define timespan for search
   if (grepl("(?i)week", timespan) == TRUE) {
     # Get number of weeks by removing non-digit characters
@@ -368,22 +372,31 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
     # Print search dates
     message("Searching from ", min_date_char, " to ", max_date_char)
   }
-
+  
   # Print message
   message("Running PubMed search...")
   
   # Add dates to query
   full_query <- paste0("(", query, ") AND ", paste0(format(min_date_char, "%Y/%m/%d")), ":3000/12/31[Date - Create]")
-
+  
   # Get summary of NCBI EUtils query
   pubmed_search <- RISmed::EUtilsSummary(
-    full_query, 
-    retmax=retMax,
-    type="esearch", db="pubmed")
-
-  # Get summary
+    full_query,
+    retmax = retMax,
+    type  = "esearch",
+    db    = "pubmed"
+  )
+  
   pubmed_summary <- RISmed::summary(pubmed_search)
-
+  
+  
+  # If summary is empty, return an empty data frame
+  if (length(pubmed_summary) == 0) {
+    
+    message("No search results were found from query.")
+    return(data.frame())
+  }
+  
   # Try running search query using RISmed R package
   pubmed_results <- tryCatch(
     {
@@ -396,6 +409,7 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
     }
   )
   
+  
   # Check if correct package is used
   try({
     if (pubmed_search@count < 1) {
@@ -406,7 +420,7 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
       warning("Error: A Medline object is returned instead of a dataframe. For output compatible with the SOLES workflow, update the RISmed package from: https://github.com/kaitlynhair/RISmed")
     }
   })
-
+  
   # Format dataframe for SOLES
   if (format_soles == TRUE) {
     pubmed_results <- pubmed_results %>%
@@ -415,23 +429,23 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
       # Remove rows with no ID
       dplyr::filter(!is.na(.data$pmid))
   }
-
+  
   # Change no abstract available to NA
   pubmed_results$abstract <- gsub("^\\[No abstract available\\]$", "", pubmed_results$abstract)
   # Change all "NA" to real NA
   pubmed_results[pubmed_results == "NA"] <- NA
   # Change all blanks to NA
   pubmed_results[pubmed_results == ""] <- NA
-
+  
   # Make DOI lowercase
   pubmed_results$doi <- tolower(pubmed_results$doi)
   
   # Remove any additional DOIs (e.g., elife versioning)
   pubmed_results$doi <- gsub("; .+$", "", pubmed_results$doi)
-
+  
   # Print number of records retrieved
   message("\nRetrieved ", nrow(pubmed_results), " records from PubMed")
-
+  
   # Return results
   return(pubmed_results)
 }
