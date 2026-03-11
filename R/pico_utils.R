@@ -845,7 +845,7 @@ check_pico <- function(con, master_node) {
 #' create_regex("input_file.xlsx")
 #' }
 #'
-create_regex <- function(path = "", file = "") {
+create_regex <- function(file = "", path = "") {
   # Read in file
   file_for_regex <- read.xlsx(here::here(path, file))
 
