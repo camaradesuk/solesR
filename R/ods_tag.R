@@ -116,6 +116,8 @@ ods_tag <- function(con, path, output_mode = "summary") {
     # Add text's names
     names(PDF_text_sentences) <-
       to_find$doi[match(names(PDF_text_sentences), to_find$path_txt)]
+  } else {
+    stop("output_mode should be 'summary' or 'full'")
   }
 
   message(paste0(
@@ -123,6 +125,12 @@ ods_tag <- function(con, path, output_mode = "summary") {
     length(names(PDF_text_sentences)),
     " text files"
   ))
+
+  # Save the current plan
+  oplan <- future::plan()
+
+  # Ensure the original plan is restored when the function exits
+  on.exit(future::plan(oplan), add = TRUE)
 
   # Run open data / code tag in multisessions
   total_cores <- future::availableCores()
