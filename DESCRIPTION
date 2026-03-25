@@ -73,7 +73,8 @@ Imports:
     khroma,
     shinyhelper,
     rsample,
-    europepmc
+    europepmc,
+    here
 VignetteBuilder: knitr
 Remotes: 
     kaitlynhair/RISmed,
