@@ -4,7 +4,7 @@
 \alias{create_regex}
 \title{Create Regular Expressions}
 \usage{
-create_regex(file = "")
+create_regex(file = "", path = "")
 }
 \arguments{
 \item{file}{Path to the input Excel file.}

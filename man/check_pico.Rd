@@ -10,7 +10,7 @@ check_pico(con, master_node)
 \arguments{
 \item{con}{Connection to soles project db}
 
-\item{master_node}{OSF node}
+\item{master_node}{OSF node for the project to retrieve the current dictionary.}
 }
 \description{
 This function checks the status of pico tables in a SOLES project and provides users the option of
@@ -19,7 +19,7 @@ updating to the newest version available on OSF.
 \examples{
 \dontrun{
 # Example usage:
-check_pico(con)
+check_pico(con, master_node = "nodestring")
 }
 
 }

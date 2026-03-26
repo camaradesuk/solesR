@@ -12,9 +12,9 @@ add_regex_soles(con, regexfile, master_node, add_node)
 
 \item{regexfile}{The path to the csv file containing the RegEx. The file should contain the following columns: \code{name}, \code{regex}, \code{type}, \code{main_category}, \code{sub_category1}, and \code{sub_category2}. If the ontology columns are empty, NAs will be introduced.}
 
-\item{master_node}{OSF node for project to retrieve.}
+\item{master_node}{OSF node for project to retrieve current dictionary.}
 
-\item{add_node}{OSF node for project to retrieve.}
+\item{add_node}{OSF node for project to retrieve and save indidual dictionaries.}
 }
 \description{
 This function takes in user-provided RegEx entries and cross-checks them against the main SOLES pico dictionary on OSF.
@@ -26,7 +26,7 @@ To be able to add new entries to the main dictionary, users will be asked to pro
 \examples{
 \dontrun{
 # Example usage:
-add_regex_soles(con, "path/to/new/regex.csv")
+add_regex_soles(con, "path/to/new/regex.csv", master_node = "nodestring", add_node = "nodestring")
 }
 
 }
