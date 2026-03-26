@@ -828,14 +828,14 @@ check_pico <- function(con, master_node) {
 #' This function reads a file containing names and their corresponding alternate names,
 #' then creates regular expressions based on these names and alternate names.
 #'
-#' @param file Path to the input Excel file.
+#' @param file Filename
+#' @param path Path
 #'
 #' @return A new Excel file with additional columns containing regular expressions.
 #'
 #' @import openxlsx
 #' @import dplyr
 #' @import here
-#' @importFrom openxlsx write.xlsx
 #'
 #' @export
 #'

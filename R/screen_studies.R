@@ -769,7 +769,6 @@ evaluate_model_performance <- function(validation_set_scores, validation_set_lab
 #'
 #' @import dplyr
 #' @importFrom janitor clean_names
-#' @importFrom solesR get_syrf_sample
 #' @export
 run_error_correction <- function(con,
                                  k_fold_scores = as.character(),

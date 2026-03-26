@@ -7,7 +7,9 @@
 create_regex(file = "", path = "")
 }
 \arguments{
-\item{file}{Path to the input Excel file.}
+\item{file}{Filename}
+
+\item{path}{Path}
 }
 \value{
 A new Excel file with additional columns containing regular expressions.
