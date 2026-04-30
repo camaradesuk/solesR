@@ -256,7 +256,7 @@ run_ml <- function(con, training_set, unscreened_set, project_name, classifier_n
 #' 
 #' Results are saved in a directory named `k-fold-validation` in the current working directory.
 #'
-#' @import dplyr tidyr readr janitor rsample
+#' @import dplyr tidyr readr janitor rsample caTools
 #' @examples
 #' \dontrun{
 #' # Example usage:
@@ -322,10 +322,13 @@ run_k_fold <- function(con,
     
     # Split in to stratified split for training & validation
     # K-fold is then performed on the training data and a set held out for final validation. Default is 0.8
-    split <- rsample::initial_split(screening_decisions, prop = training_prop, strata = "LABEL")
+    split <- caTools::sample.split(
+      screening_decisions$LABEL,
+      SplitRatio = training_prop
+    )
     
-    training_set <- rsample::training(split)
-    validation_set  <- rsample::testing(split)
+    training_set <- screening_decisions[split, ]
+    validation_set <- screening_decisions[!split, ]
     
   }
   

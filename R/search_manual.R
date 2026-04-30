@@ -412,6 +412,7 @@ process_medline <- function(path) {
 #' \dontrun{
 #' # Example usage:
 #' wos_data <- process_wos("path/to/wos_data.bib")
+#' wos_data <- process_wos("path/to/wos_data.ris")
 #' }
 #'
 #' @importFrom bibliometrix convert2df
