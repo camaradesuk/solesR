@@ -25,6 +25,7 @@ creates a unique identifier (uid) by modifying the existing uid column, and sets
 \dontrun{
 # Example usage:
 wos_data <- process_wos("path/to/wos_data.bib")
+wos_data <- process_wos("path/to/wos_data.ris")
 }
 
 }
