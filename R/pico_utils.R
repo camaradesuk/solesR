@@ -385,29 +385,9 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
     ) %>%
     rowwise() %>%
     mutate(
-      match_type = case_when(type_ont != type ~ FALSE, type_ont == type ~ TRUE)
-    ) %>%
-    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>%
-    ungroup() %>%
-    mutate(
-      is_likely_new = case_when(
-        is.na(match) ~ TRUE,
-        match %in% TRUE & match_type %in% FALSE ~ TRUE,
-        match %in% TRUE & match_type %in% TRUE ~ FALSE
-      ),
-      is_new = case_when(
-        is.na(match) ~ TRUE,
-        is_likely_new %in%
-          TRUE &
-          match_concept %in% TRUE &
-          match_type %in% TRUE ~ FALSE,
-        is_likely_new %in%
-          TRUE &
-          match_concept %in% TRUE &
-          match_type %in% FALSE ~ TRUE,
-        is_likely_new %in% TRUE & match_concept %in% FALSE ~ TRUE,
-        is_likely_new %in% FALSE ~ FALSE
-      )
+      match_type = case_when(type_ont != type ~ FALSE, type_ont == type ~ TRUE),
+      match_concept = suppressWarnings(try_grepl(regex_ont, name)),
+      is_new = match_type != TRUE | match_concept != TRUE
     ) %>%
     filter(!is.na(name))
 
@@ -415,38 +395,15 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
     fuzzyjoin::regex_left_join(matched, by = c("regex" = "name_ont")) %>%
     rowwise() %>%
     mutate(
-      match_type = case_when(type_ont != type ~ FALSE, type_ont == type ~ TRUE)
-    ) %>%
-    mutate(match_concept = suppressWarnings(try_grepl(regex_ont, name))) %>%
-    ungroup() %>%
-    mutate(
-      is_likely_new = case_when(
-        is.na(match) ~ TRUE,
-        match %in% TRUE & match_type %in% FALSE ~ TRUE,
-        match %in% TRUE & match_type %in% TRUE ~ FALSE
-      ),
-      is_new = case_when(
-        is.na(match) ~ TRUE,
-        is_likely_new %in%
-          TRUE &
-          match_concept %in% TRUE &
-          match_type %in% TRUE ~ FALSE,
-        is_likely_new %in%
-          TRUE &
-          match_concept %in% TRUE &
-          match_type %in% FALSE ~ TRUE,
-        is_likely_new %in% TRUE & match_concept %in% FALSE ~ TRUE,
-        is_likely_new %in% FALSE ~ FALSE
-      )
+      match_type = case_when(type_ont != type ~ FALSE, type_ont == type ~ TRUE),
+      match_concept = suppressWarnings(try_grepl(regex_ont, name)),
+      is_new = match_type != TRUE | match_concept != TRUE
     ) %>%
     filter(!is.na(name))
 
   regex_match <- rbind(regex_match_str, regex_match_nostr)
 
-  # retain only new regexes
-  message("Removing RegEx that already exist in the soles database...")
-
-  existing_names <- regex_match %>%
+  existing <- regex_match %>%
     filter(is_new %in% TRUE) %>%
     filter(name %in% ontology_names) %>%
     select(name, type) %>%
@@ -454,8 +411,129 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
     rename(type_new = type) %>%
     left_join(pico_o, by = "name") %>%
     mutate(match_type = ifelse(type_new == type, TRUE, FALSE)) %>%
-    filter(match_type %in% TRUE) %>%
+    filter(match_type %in% TRUE)
+
+  existing_names <- existing %>%
     pull(name)
+
+  # Regex that could be updated
+  existing_entries <- existing %>%
+    select(name, type = type_new) %>%
+    distinct()
+
+  regex_to_update <- regex_match %>%
+    semi_join(existing_entries, by = c("name", "type")) %>%
+    filter(is_new %in% TRUE) %>%
+    select(
+      name,
+      regex,
+      type,
+      main_category,
+      sub_category1,
+      sub_category2
+    ) %>%
+    distinct()
+
+  update_existing <- FALSE
+  has_updates <- FALSE
+
+  if (nrow(regex_to_update) > 0) {
+    message(
+      nrow(regex_to_update),
+      " existing entries with same name/type were found."
+    )
+
+    purrr::pwalk(
+      regex_to_update,
+
+      function(
+        name,
+        regex,
+        type,
+        main_category,
+        sub_category1,
+        sub_category2
+      ) {
+        current_entry <- pico_o %>%
+          filter(
+            name == !!name,
+            type == !!type
+          ) |>
+          left_join(pico_d, by = join_by(regex_id == id)) |>
+          select(name, regex, everything())
+
+        cat(crayon::blue("Current entry:\n"))
+        cat("Name: ", current_entry$name, "\n")
+        cat("Type: ", current_entry$type, "\n")
+        cat("Main category: ", current_entry$main_category, "\n")
+        cat("Subcategory 1: ", current_entry$sub_category1, "\n")
+        cat("Subcategory 2: ", current_entry$sub_category2, "\n")
+
+        cat("Regex:\n", current_entry$regex, "\n\n")
+
+        cat(crayon::bgBlue("New entry:\n"))
+        cat("Name: ", name, "\n")
+        cat("Type: ", type, "\n")
+        cat("Main category: ", main_category, "\n")
+        cat("Subcategory 1: ", sub_category1, "\n")
+        cat("Subcategory 2: ", sub_category2, "\n")
+
+        cat("Regex:\n", regex, "\n\n")
+
+        proceed_update <- menu(
+          c("Yes", "No"),
+          title = crayon::bgBlue(paste0(
+            "Update ontology fields for: ",
+            name,
+            "?"
+          ))
+        )
+
+        if (proceed_update == 1) {
+          has_updates <<- TRUE
+
+          update_data <- tibble::tibble(
+            name = name,
+            type = type,
+            main_category = main_category,
+            sub_category1 = sub_category1,
+            sub_category2 = sub_category2
+          ) %>%
+            left_join(
+              pico_o %>%
+                select(name, type, regex_id),
+              by = c("name", "type")
+            ) %>%
+            select(
+              name,
+              regex_id,
+              type,
+              main_category,
+              sub_category1,
+              sub_category2
+            )
+
+          pico_o <<- pico_o %>%
+            rows_update(
+              update_data,
+              by = c("name", "type")
+            )
+
+          message(
+            "Updated: ",
+            name
+          )
+        }
+      }
+    )
+  }
+
+  if (!update_existing) {
+    # retain only new regexes
+    message(
+      "Removing RegEx that already exist in the soles database..."
+    )
+  }
 
   new_regex <- regex_match %>%
     filter(!name %in% existing_names) %>%
@@ -471,17 +549,19 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
 
   if (
     n_new < 1 &
+      !has_updates &
       isTRUE(update)
   ) {
     message("No new RegEx identified.")
   } else if (
     n_new < 1 &
+      !has_updates &
       isFALSE(update)
   ) {
     message(
       "No new RegEx identified. To make use of the most up-to-date pico dictionary, we recommend getting the latest version from OSF. See ?solesR::check_pico()"
     )
-  } else if (n_new > 0) {
+  } else if (n_new > 0 | has_updates) {
     # if new regexes are provided go through more checks and update OSF
 
     # Retrieve ontology information -------------------------------------------
@@ -586,15 +666,21 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
         stop("Please provide the required metadata to continue.")
       } else if (!is.na(entry_id) & !is.na(user_id)) {
         # merge back with master files
-        pico_dictionary <- pico_d %>%
-          bind_rows(pico_d_new) %>%
-          bind_rows(unknown_d_new) %>%
-          arrange(id)
 
-        pico_ontology <- pico_o %>%
-          bind_rows(pico_o_new) %>%
-          bind_rows(unknown_o_new) %>%
-          arrange(regex_id)
+        pico_dictionary <- pico_d
+        pico_ontology <- pico_o
+
+        if (n_new > 0) {
+          pico_dictionary <- pico_dictionary %>%
+            bind_rows(pico_d_new) %>%
+            bind_rows(unknown_d_new) %>%
+            arrange(id)
+
+          pico_ontology <- pico_ontology %>%
+            bind_rows(pico_o_new) %>%
+            bind_rows(unknown_o_new) %>%
+            arrange(regex_id)
+        }
 
         # write updated master files locally
 
@@ -632,8 +718,8 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
         })
 
         dict_2split <- pico_o_new %>%
-          left_join(pico_d_new, by = c("regex_id" = "id")) %>% 
-          rename(id = regex_id) %>% 
+          left_join(pico_d_new, by = c("regex_id" = "id")) %>%
+          rename(id = regex_id) %>%
           select(id, regex, type)
 
         dict_split <- split(dict_2split, dict_2split$type)
@@ -700,10 +786,30 @@ add_regex_soles <- function(con, regexfile, master_node, add_node) {
         )
         if (proceed_appendAWS == "1") {
           message("Updating pico tables in soles project AWS database...")
-          DBI::dbAppendTable(con, "pico_dictionary", pico_d_new)
-          DBI::dbAppendTable(con, "pico_ontology", pico_o_new)
-        }
 
+          if (n_new > 0) {
+            DBI::dbAppendTable(
+              con,
+              "pico_dictionary",
+              pico_d_new
+            )
+
+            DBI::dbAppendTable(
+              con,
+              "pico_ontology",
+              pico_o_new
+            )
+          }
+
+          if (has_updates) {
+            DBI::dbWriteTable(
+              con,
+              "pico_ontology",
+              pico_o,
+              overwrite = TRUE
+            )
+          }
+        }
         # delete temp dir
         unlink("temp", recursive = TRUE)
         message("Done!")
