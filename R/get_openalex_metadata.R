@@ -141,7 +141,7 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   # Get data
   included <- dbReadTable(con, "study_classification") %>% filter(decision == "include")
   dois <- tbl(con, "unique_citations") %>% select(uid, doi) %>% collect()
-  
+
   if (is.null(fill_table)){
     
     # Filter for rows containing no data ----
@@ -191,10 +191,13 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   for(i in 1:length(citations_missing_data$doi)){
     
     # Try to retrieve information using title search
-    try(new <- openalexR::oa_fetch(
-      entity = "works",
-      doi = citations_missing_data$doi[i]),
-      silent = T)
+    new <- suppressWarnings(
+      try(openalexR::oa_fetch(
+          entity = "works",
+          doi = citations_missing_data$doi[i]),
+        silent = TRUE
+      )
+    )
     
     # Bind results together
     if(is.data.frame(new)){
@@ -209,174 +212,366 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     
     
   }
-  
+ 
   if(is.null(res)){
     
     message("Couldn't tag any more records.")
-    return(citations)
+    return(citations_missing_data)
   }
   
   # Unnest author data, and extract institution info ----
-  res_institution <- res %>% 
-    unnest(authorships, names_sep = "_") %>%
-    filter(authorships_author_position == "first") %>%
-    rename(affiliations = authorships_affiliations) %>%
-    unnest(affiliations, names_sep = "_") %>%
-    select(doi, 
-           institution_id = affiliations_id, 
-           name = affiliations_display_name, 
-           ror = affiliations_ror, 
-           institution_country_code = affiliations_country_code, 
-           type = affiliations_type) %>%
-    mutate(institution_country_code = toupper(institution_country_code), 
-           doi = str_remove(doi, "https://doi.org/"),
-           method = "OpenAlex") %>%
-    replace(is.na(.), "Unknown") %>%
-    filter(!doi%in% institution_full$doi,
-           doi %in% citations_missing_data$doi)
+  res_institution <- tryCatch({
+    
+    res_institution <- res %>% 
+      tidyr::unnest(authorships, names_sep = "_") %>%
+      filter(authorships_author_position == "first") %>%
+      rename(affiliations = authorships_affiliations) %>%
+      tidyr::unnest(affiliations, names_sep = "_") %>%
+      select(
+        doi, 
+        institution_id = affiliations_id, 
+        name = affiliations_display_name, 
+        ror = affiliations_ror, 
+        institution_country_code = affiliations_country_code, 
+        type = affiliations_type
+      ) %>%
+      mutate(
+        institution_country_code = toupper(institution_country_code), 
+        doi = str_remove(doi, "https://doi.org/"),
+        method = "OpenAlex"
+      ) %>%
+      replace(is.na(.), "Unknown") %>%
+      filter(
+        !doi %in% institution_full$doi,
+        doi %in% citations_missing_data$doi
+      )
+    
+    res_institution_failed <- citations_missing_data %>%
+      filter(
+        !doi %in% res_institution$doi,
+        !doi %in% institution_full$doi
+      ) %>%
+      mutate(
+        institution_id = "Unknown",
+        name = "Unknown",
+        ror = "Unknown", 
+        institution_country_code = "Unknown",
+        type = "Unknown",
+        method = "OpenAlex"
+      )
+    
+    rbind(res_institution, res_institution_failed)
+    
+  }, error = function(e){
+    
+    message(
+      paste("ERROR in res_institution:", conditionMessage(e))
+    )
+    
+    NULL
+  })
   
-  res_institution_failed <- citations_missing_data %>%
-    filter(!doi %in% res_institution$doi,
-           !doi%in% institution_full$doi) %>%
-    mutate(institution_id = "Unknown", name = "Unknown", ror = "Unknown", 
-           institution_country_code = "Unknown", type = "Unknown", method = "OpenAlex")
-  
-  res_institution <- rbind(res_institution, res_institution_failed)
   
   # Take results and transform data for discipline_tag
-  res_concepts <- res %>% 
-    unnest(concepts, names_sep = "_") %>% 
-    select(doi, concepts_display_name, concepts_level, concepts_score) %>% 
-    mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
-    filter(!concepts_score == 0,
-           concepts_level == 2 | concepts_level == 1 | concepts_level == 0) %>%
-    dplyr::rename(main_discipline = concepts_display_name,
-                  level = concepts_level,
-                  score = concepts_score) %>% 
-    mutate(main_discipline = ifelse(score < 0.4, "Unknown", main_discipline),
-           method = "OpenAlex") %>%
-    filter(!main_discipline == "Unknown",
-           !doi %in% discipline_full$doi,
-           doi %in% citations_missing_data$doi) %>%
-    replace(is.na(.), "Unknown")
-  
-  res_concepts_failed <- citations_missing_data %>%
-    filter(!doi %in% res_concepts$doi,
-           !doi %in% discipline_full$doi) %>%
-    mutate(main_discipline = "Unknown", score = "Unknown", level = "Unknown",
-           method = "OpenAlex")
-  
-  res_concepts <- rbind(res_concepts, res_concepts_failed)
-  
-  # Take results and transform data for funder_grant_tag
-  res_funder <- res %>% 
-    select(doi, grants) %>%
-    mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
-    unnest_longer(grants) %>% 
-    filter(!is.na(grants))
-  
-  if (nrow(res_funder > 0)){
-    res_funder %>% 
-      filter(!grants_id == "funder")
+  res_concepts <- tryCatch({
     
-    res_funder$award_id <- NA
+    res_concepts <- res %>% 
+      tidyr::unnest(concepts, names_sep = "_") %>% 
+      select(doi, concepts_display_name, concepts_level, concepts_score) %>% 
+      mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
+      filter(
+        !concepts_score == 0,
+        concepts_level == 2 | concepts_level == 1 | concepts_level == 0
+      ) %>%
+      dplyr::rename(
+        main_discipline = concepts_display_name,
+        level = concepts_level,
+        score = concepts_score
+      ) %>% 
+      mutate(
+        main_discipline = ifelse(score < 0.4, "Unknown", main_discipline),
+        method = "OpenAlex"
+      ) %>%
+      filter(
+        !main_discipline == "Unknown",
+        !doi %in% discipline_full$doi,
+        doi %in% citations_missing_data$doi
+      ) %>%
+      replace(is.na(.), "Unknown")
     
-    if (nrow(res_funder) > 1) {
-      for (i in 1:(nrow(res_funder) - 1)) {
-        
-        if (res_funder$grants_id[i + 1] == "award_id") {
-          
-          res_funder$award_id[i] <- res_funder$grants[i + 1]
-        }
-      }
+    res_concepts_failed <- citations_missing_data %>%
+      filter(
+        !doi %in% res_concepts$doi,
+        !doi %in% discipline_full$doi
+      ) %>%
+      mutate(
+        main_discipline = "Unknown",
+        score = "Unknown",
+        level = "Unknown",
+        method = "OpenAlex"
+      )
+    
+    rbind(res_concepts, res_concepts_failed)
+    
+  }, error = function(e){
+    
+    message(
+      paste("ERROR in res_concepts:", e$message)
+    )
+    
+    NULL
+  })
+
+
+  res_funder <- tryCatch({
+    
+    if (all(is.na(res$awards))) {
+      
+      res_awards <- tibble(
+        doi = character(),
+        funder_name = character(),
+        award_id = character()
+      )
+      
+    } else {
+      
+      res_awards <- res %>%
+        dplyr::select(id, doi, awards) %>%
+        dplyr::mutate(doi = stringr::str_remove(doi, "https://doi.org/")) %>%
+        dplyr::filter(!is.na(awards)) %>% 
+        dplyr::mutate(
+          awards_long = purrr::map(awards, ~ {
+            vec <- .x
+            names(vec)[names(vec) == "id"] <- "award_id"
+            names(vec)[names(vec) == "funder_display_name"] <- "funder_name"
+            tibble(
+              field = names(vec),
+              value = as.character(vec)
+            )
+          })
+        ) %>%
+        dplyr::select(-awards) %>%
+        tidyr::unnest(awards_long) %>%
+        dplyr::group_by(id, doi, field) %>%
+        dplyr::mutate(funder_index = row_number()) %>%
+        tidyr::pivot_wider(names_from = field, values_from = value) %>%
+        dplyr::ungroup() %>%
+        dplyr::select(doi, funder_name, award_id = funder_award_id) %>%
+        dplyr::group_by(doi, funder_name) %>%
+        dplyr::summarise(
+          award_id = paste(unique(award_id), collapse = "; "),
+          .groups = "drop"
+        )
     }
     
-    res_funder <- res_funder %>%
-      filter(!grants_id == "award_id") %>% 
-      select(-grants_id, funder_name = grants, doi) %>%
-      mutate(method = "OpenAlex") %>%
-      replace(is.na(.), "Unknown") %>%
-      filter(!doi %in% funder_full$doi,
-             doi %in% citations_missing_data$doi)
+    if (all(is.na(res$funders))) {
+      
+      res_funder <- tibble(
+        doi = character(),
+        funder_name = character()
+      )
+      
+    } else {
+      
+      res_funder <- res %>%
+        dplyr::select(doi, funders) %>%
+        dplyr::mutate(doi = stringr::str_remove(doi, "https://doi.org/")) %>%
+        tidyr::unnest_longer(funders) %>%
+        tidyr::unnest_wider(funders) %>%
+        dplyr::filter(!is.na(display_name)) %>%
+        dplyr::select(doi, funder_name = display_name) %>% 
+        dplyr::distinct() %>% 
+        dplyr::anti_join(
+          res_awards,
+          by = c("doi", "funder_name")
+        )
+    }
+    
+    res_funder_awards <- bind_rows(res_awards, res_funder) %>% 
+      dplyr::mutate(
+        method = "OpenAlex",
+        award_id = ifelse(is.na(award_id), "Unknown", award_id)
+      )
     
     res_funder_failed <- citations_missing_data %>%
-      filter(!doi %in% res_funder$doi,
-             !doi %in% funder_full$doi) %>%
-      mutate(funder_name = "Unknown", award_id = "Unknown", method = "OpenAlex")
+      dplyr::filter(
+        !doi %in% res_funder$doi,
+        !doi %in% funder_full$doi
+      ) %>%
+      dplyr::mutate(
+        funder_name = "Unknown",
+        award_id = "Unknown",
+        method = "OpenAlex"
+      )
     
-    res_funder <- rbind(res_funder, res_funder_failed)
+    rbind(res_funder_awards, res_funder_failed) %>% 
+      dplyr::filter(!grepl("https://openalex.org/", funder_name)) %>% 
+      dplyr::distinct()
     
-  } else{
-    res_funder <- citations_missing_data %>%
-      filter(!doi %in% funder_full$doi) %>%
-      mutate(funder_name = "Unknown", award_id = "Unknown", method = "OpenAlex")
-  }
+  }, error = function(e){
+    
+    message(
+      paste("ERROR in res_funder:", e$message)
+    )
+    
+    NULL
+  })
   
-  # Fix duplicate rows with incorrect info
-  res_funder <- res_funder %>% filter(!grepl("https://openalex.org/", funder_name))
   
   # Transform data for citation_count_tag
-  res_citation_count <- res %>% 
-    select(doi, count = cited_by_count) %>% 
-    mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
-    mutate(method = "OpenAlex",
-           date = Sys.Date()) %>% 
-    filter(!doi %in% citation_count_full$doi,
-           doi %in% citations_missing_data$doi) %>%
-    replace(is.na(.), "Unknown")
-  
-  res_citation_count_failed <- citations_missing_data %>%
-    filter(!doi %in% res_citation_count$doi,
-           !doi %in% citation_count_full$doi) %>%
-    mutate(count = NA, method = "OpenAlex", date = Sys.Date())
-  
-  res_citation_count <- rbind(res_citation_count, res_citation_count_failed)
-  
+  res_citation_count <- tryCatch({
+    
+    res_citation_count <- res %>% 
+      select(doi, count = cited_by_count) %>% 
+      mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
+      mutate(
+        method = "OpenAlex",
+        date = Sys.Date()
+      ) %>% 
+      filter(
+        !doi %in% citation_count_full$doi,
+        doi %in% citations_missing_data$doi
+      ) %>%
+      replace(is.na(.), "Unknown")
+    
+    res_citation_count_failed <- citations_missing_data %>%
+      filter(
+        !doi %in% res_citation_count$doi,
+        !doi %in% citation_count_full$doi
+      ) %>%
+      mutate(
+        count = NA,
+        method = "OpenAlex",
+        date = Sys.Date()
+      )
+    
+    rbind(res_citation_count, res_citation_count_failed)
+    
+  }, error = function(e){
+    
+    message(
+      paste("ERROR in res_citation_count:", e$message)
+    )
+    
+    NULL
+  })
   
   # Transform data for retraction_tag
-  res_retraction <- res %>% 
-    select(doi, is_retracted) %>% 
-    mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
-    mutate(method = "OpenAlex",
-           date = Sys.Date()) %>% 
-    filter(!doi %in% retraction_full$doi,
-           doi %in% citations_missing_data$doi) %>%
-    replace(is.na(.), "Unknown")
+  res_retraction <- tryCatch({
+    
+    res_retraction <- res %>% 
+      select(doi, is_retracted) %>% 
+      mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
+      mutate(
+        method = "OpenAlex",
+        date = Sys.Date()
+      ) %>% 
+      filter(
+        !doi %in% retraction_full$doi,
+        doi %in% citations_missing_data$doi
+      ) %>%
+      replace(is.na(.), "Unknown")
+    
+    res_retraction_failed <- citations_missing_data %>%
+      filter(
+        !doi %in% res_retraction$doi,
+        !doi %in% retraction_full$doi
+      ) %>%
+      mutate(
+        is_retracted = NA,
+        method = "OpenAlex",
+        date = Sys.Date()
+      )
+    
+    rbind(res_retraction, res_retraction_failed)
+    
+  }, error = function(e){
+    
+    message(
+      paste("ERROR in res_retraction:", e$message)
+    )
+    
+    NULL
+  })
   
-  res_retraction_failed <- citations_missing_data %>%
-    filter(!doi %in% res_retraction$doi,
-           !doi %in% retraction_full$doi) %>%
-    mutate(is_retracted = NA, method = "OpenAlex", date = Sys.Date())
-  
-  res_retraction <- rbind(res_retraction, res_retraction_failed)
-  res_retraction$method = "OpenAlex"
-  
-  
-  res_oa <- res %>% 
-    select(doi, is_oa, oa_status) %>% 
-    # Fix logic in is_oa
-    mutate(is_oa = if_else(oa_status == "closed", FALSE, TRUE)) %>%
-    mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
-    mutate(method = "OpenAlex") %>% 
-    filter(!doi %in% open_access_full$doi,
-           doi %in% citations_missing_data$doi) %>%
-    replace(is.na(.), "Unknown")
-  
-  res_oa_failed <- citations_missing_data %>%
-    filter(!doi %in% res_oa$doi,
-           !doi %in% open_access_full$doi) %>%
-    mutate(is_oa = NA, oa_status = "Unknown", method = "OpenAlex")
-  
-  res_oa <- rbind(res_oa, res_oa_failed)
+  # Transform data for open access tag
+  res_oa <- tryCatch({
+    
+    res_oa <- res %>% 
+      select(doi, is_oa, oa_status) %>% 
+      
+      # Fix logic in is_oa
+      mutate(is_oa = if_else(oa_status == "closed", FALSE, TRUE)) %>%
+      
+      mutate(doi = str_remove(doi, "https://doi.org/")) %>% 
+      
+      mutate(method = "OpenAlex") %>% 
+      
+      filter(
+        !doi %in% open_access_full$doi,
+        doi %in% citations_missing_data$doi
+      ) %>%
+      
+      replace(is.na(.), "Unknown")
+    
+    res_oa_failed <- citations_missing_data %>%
+      filter(
+        !doi %in% res_oa$doi,
+        !doi %in% open_access_full$doi
+      ) %>%
+      mutate(
+        is_oa = NA,
+        oa_status = "Unknown",
+        method = "OpenAlex"
+      )
+    
+    rbind(res_oa, res_oa_failed)
+    
+  }, error = function(e){
+    
+    message(
+      paste("ERROR in res_oa:", e$message)
+    )
+    
+    NULL
+  })
   
   
   # Append tables with new data ----
-  dbWriteTable(con, "institution_tag", res_institution, append = TRUE)
-  dbWriteTable(con, "discipline_tag", res_concepts, append = TRUE)
-  dbWriteTable(con, "funder_grant_tag", res_funder, append = TRUE)
-  dbWriteTable(con, "oa_tag", res_oa, append = TRUE)
-  dbWriteTable(con, "citation_count_tag", res_citation_count, append = TRUE)
-  dbWriteTable(con, "retraction_tag", res_retraction, append = TRUE)
+  if (!is.null(res_institution) && nrow(res_institution) > 0) {
+    dbWriteTable(con, "institution_tag", res_institution, append = TRUE)
+    message(paste0(nrow(res_institution)," records added to institution_tag"))
+  }
+  
+  if (!is.null(res_concepts) && nrow(res_concepts) > 0) {
+    dbWriteTable(con, "discipline_tag", res_concepts, append = TRUE)
+    message(paste0(nrow(res_concepts)," records added to discipline_tag"))
+    
+  }
+  
+  if (!is.null(res_funder) && nrow(res_funder) > 0) {
+    dbWriteTable(con, "funder_grant_tag", res_funder, append = TRUE)
+    message(paste0(nrow(res_funder)," records added to funder_grant_tag"))
+    
+  }
+  
+  if (!is.null(res_oa) && nrow(res_oa) > 0) {
+    dbWriteTable(con, "oa_tag", res_oa, append = TRUE)
+    message(paste0(nrow(res_oa)," records added to oa_tag"))
+    
+  }
+  
+  if (!is.null(res_citation_count) && nrow(res_citation_count) > 0) {
+    dbWriteTable(con, "citation_count_tag", res_citation_count, append = TRUE)
+    message(paste0(nrow(res_citation_count)," records added to citation_count_tag"))
+    
+  }
+  
+  if (!is.null(res_retraction) && nrow(res_retraction) > 0) {
+    dbWriteTable(con, "retraction_tag", res_retraction, append = TRUE)
+    message(paste0(nrow(res_retraction)," records added to retraction_tag"))
+    
+  }
   
   message(paste0(length(citations_missing_data$doi)," records tagged via OpenAlex!"))
   
