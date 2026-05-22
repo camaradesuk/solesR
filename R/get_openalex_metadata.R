@@ -141,7 +141,7 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   # Get data
   included <- dbReadTable(con, "study_classification") %>% filter(decision == "include")
   dois <- tbl(con, "unique_citations") %>% select(uid, doi) %>% collect()
-
+  
   if (is.null(fill_table)){
     
     # Filter for rows containing no data ----
@@ -193,8 +193,8 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     # Try to retrieve information using title search
     new <- suppressWarnings(
       try(openalexR::oa_fetch(
-          entity = "works",
-          doi = citations_missing_data$doi[i]),
+        entity = "works",
+        doi = citations_missing_data$doi[i]),
         silent = TRUE
       )
     )
@@ -212,7 +212,7 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     
     
   }
- 
+  
   if(is.null(res)){
     
     message("Couldn't tag any more records.")
@@ -321,8 +321,8 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
     
     NULL
   })
-
-
+  
+  
   res_funder <- tryCatch({
     
     if (all(is.na(res$awards))) {
@@ -538,39 +538,82 @@ get_openalex_metadata <- function(con, fill_table = NULL, n = 100){
   
   
   # Append tables with new data ----
+  # Append tables with new data ----
+  
   if (!is.null(res_institution) && nrow(res_institution) > 0) {
+    
     dbWriteTable(con, "institution_tag", res_institution, append = TRUE)
-    message(paste0(nrow(res_institution)," records added to institution_tag"))
+    
+    message(paste0(nrow(
+          res_institution %>% 
+            dplyr::filter(!institution_id == "Unknown") %>% 
+            dplyr::distinct(doi)
+        ),
+        " studies with Institution data added to institution_tag"))
   }
   
   if (!is.null(res_concepts) && nrow(res_concepts) > 0) {
-    dbWriteTable(con, "discipline_tag", res_concepts, append = TRUE)
-    message(paste0(nrow(res_concepts)," records added to discipline_tag"))
     
+    dbWriteTable(con, "discipline_tag", res_concepts, append = TRUE)
+    
+    message(
+      paste0(
+        nrow(
+          res_concepts %>% 
+            dplyr::filter(!main_discipline == "Unknown") %>% 
+            dplyr::distinct(doi)
+        ),
+        " studies with Discipline data added to discipline_tag"
+      )
+    )
   }
   
   if (!is.null(res_funder) && nrow(res_funder) > 0) {
-    dbWriteTable(con, "funder_grant_tag", res_funder, append = TRUE)
-    message(paste0(nrow(res_funder)," records added to funder_grant_tag"))
     
+    dbWriteTable(con, "funder_grant_tag", res_funder, append = TRUE)
+    
+    message(paste0(nrow(
+          res_funder %>% 
+            dplyr::filter(!funder_name == "Unknown") %>% 
+            dplyr::distinct(doi)
+        ),
+        " studies with Funder data added to funder_grant_tag"))
   }
   
   if (!is.null(res_oa) && nrow(res_oa) > 0) {
-    dbWriteTable(con, "oa_tag", res_oa, append = TRUE)
-    message(paste0(nrow(res_oa)," records added to oa_tag"))
     
+    dbWriteTable(con, "oa_tag", res_oa, append = TRUE)
+    
+    message(paste0(nrow(
+          res_oa %>% 
+            dplyr::filter(!oa_status == "Unknown") %>% 
+            dplyr::distinct(doi)
+        ),
+        " studies with Open Access data added to oa_tag"))
   }
   
   if (!is.null(res_citation_count) && nrow(res_citation_count) > 0) {
-    dbWriteTable(con, "citation_count_tag", res_citation_count, append = TRUE)
-    message(paste0(nrow(res_citation_count)," records added to citation_count_tag"))
     
+    dbWriteTable(con, "citation_count_tag", res_citation_count, append = TRUE)
+    
+    message(paste0(nrow(
+          res_citation_count %>% 
+            dplyr::filter(!is.na(count)) %>% 
+            dplyr::distinct(doi)
+        ),
+        " studies with Citation Count data added to citation_count_tag"))
   }
   
   if (!is.null(res_retraction) && nrow(res_retraction) > 0) {
-    dbWriteTable(con, "retraction_tag", res_retraction, append = TRUE)
-    message(paste0(nrow(res_retraction)," records added to retraction_tag"))
     
+    dbWriteTable(con, "retraction_tag", res_retraction, append = TRUE)
+    
+    message(paste0(nrow(
+          res_retraction %>% 
+            dplyr::filter(!is.na(is_retracted)) %>% 
+            dplyr::distinct(doi)
+        ),
+        " studies with Retraction data added to retraction_tag"))
   }
   
   message(paste0(length(citations_missing_data$doi)," records tagged via OpenAlex!"))
