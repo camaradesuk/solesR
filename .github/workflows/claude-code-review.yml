@@ -5,24 +5,26 @@ on:
     types: [opened, synchronize, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+    #   - "R/**/*.R"
+    #   - "tests/**/*.R"
 
 jobs:
   claude-review:
+    # Skip PRs from forks: secrets aren't provided to fork PR workflows, so the Claude step
+    # would fail and turn checks red for external contributors.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+
     # Optional: Filter by PR author
     # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    #   github.event.pull_request.head.repo.full_name == github.repository &&
+    #   (github.event.pull_request.user.login == 'external-contributor' ||
+    #    github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR')
 
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
 
     steps:
@@ -36,9 +38,101 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
+
+          # Sticky progress comment on the PR so it's obvious the review is
+          # running and what stage it's at.
+          track_progress: true
+
+          # Direct review prompt (replaces the `code-review` marketplace
+          # plugin, whose `gh` calls the action's tool sandbox denied silently
+          # — the result was "No buffered inline comments" and no review on the
+          # PR). Pairing the action's native inline-comment MCP tool with an
+          # explicitly allowlisted `gh pr comment` gives a reliable comment path.
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            Review this pull request. The repository is **solesR**, an R
+            package supporting Systematic Online Living Evidence Summaries
+            (SOLES) for preclinical / biomedical research. It automates
+            systematic literature searches across bibliographic APIs
+            (PubMed/RISmed, Web of Science, Scopus, OpenAlex, Crossref),
+            deduplicates results (ASySD), downloads full texts, applies
+            regex and PICO tagging, assesses risk-of-bias and open-data /
+            open-code reporting (oddpub), and integrates with SyRF and OSF.
+            It also ships Shiny modules. Read `DESCRIPTION`, `README.md` and
+            any `CLAUDE.md` first to ground yourself in the package's deps
+            and conventions.
+
+            Focus areas, in priority order:
+
+            1. **Correctness** — Logic errors, edge cases, off-by-one,
+               unhandled error paths. Question whether the change does what
+               its title/description claims. R-specific traps to watch:
+               `data.table` modify-by-reference side effects, dplyr/tidyeval
+               non-standard-evaluation quoting bugs, silent
+               factor/character/`NA` coercion, accidental vector recycling,
+               `1:length(x)` / `seq_len` on possibly-empty vectors, and
+               `==` where `%in%` or `identical()` is meant.
+            2. **External API & data integrity** — These functions hit
+               rate-limited third-party APIs (PubMed, WoS, Scopus, OpenAlex,
+               Crossref, OSF). Check graceful handling of network failures,
+               empty or partial responses, pagination, rate limiting, and
+               missing API keys. Deduplication and DOI normalisation must not
+               drop or wrongly merge distinct records. Long-running jobs
+               should fail safely and ideally be resumable rather than losing
+               accumulated results.
+            3. **Security** — API keys, tokens and credentials must come from
+               environment variables / `Sys.getenv()` / user-supplied config,
+               never hard-coded or committed. No secrets in examples, vignettes
+               or test fixtures. Validate inputs in Shiny modules.
+            4. **R package conventions** — `man/` and `NAMESPACE` are
+               roxygen2-generated ("do not edit by hand"): hand-edits, or
+               new/changed exported functions without a matching
+               `devtools::document()` run, are a defect. Every package used
+               must be declared in `DESCRIPTION` (`Imports` / `Suggests` /
+               `Remotes`); reference external functions with `pkg::fn` or
+               `@importFrom`, never `library()` / `require()` inside package
+               code. `R CMD check` should stay clean — no new NOTEs/WARNINGs,
+               including undocumented arguments and "no visible binding for
+               global variable" from NSE (declare via `utils::globalVariables`
+               or use `.data[[ ]]`).
+            5. **Performance** — Bibliographic datasets are large. Watch for
+               accidental full copies of big `data.table` / `data.frame`s,
+               row-wise loops that should be vectorised, and correct,
+               leak-free parallelism (`foreach` / `doParallel` / `parallel`
+               cluster setup and teardown, `.packages` / `.export`).
+            6. **Documentation** — roxygen blocks and `NAMESPACE` regenerated
+               together. User-facing changes need README / vignette / Wiki
+               updates, and a `DESCRIPTION` `Version:` bump where appropriate.
+            7. **Testing** — New or changed behaviour should ship with
+               `testthat` (3rd edition) tests. Mock external API calls rather
+               than hitting live services in tests. Flag coverage-padding
+               tests that don't exercise real behaviour.
+
+            Output rules:
+            - Use `mcp__github_inline_comment__create_inline_comment` for
+              every line-specific finding. Quote `file:line` and explain the
+              issue concisely.
+            - Use `gh pr comment` ONCE at the end for the overall summary:
+              top 3 things to address, plus an explicit verdict
+              (approve / request changes / comment only).
+            - Be terse. Skip praise unless it flags something the author
+              clearly got right under hard constraints. Do not restate what
+              the PR already says.
+
+          # --model: pin to Sonnet 4.6 explicitly. The action's default is an
+          #   unversioned Sonnet alias; pinning the version gives review-output
+          #   stability across action upgrades. Sonnet reviews PRs well and
+          #   uses far less plan quota than Opus per turn.
+          # --allowedTools: without this allowlist the action sandboxes
+          #   Claude's tools and `gh` calls are denied silently (visible as
+          #   `permission_denials_count` in the run log). The MCP tool is
+          #   required for line-specific comments; the `gh` Bash patterns cover
+          #   overall-summary posting and diff inspection.
+          claude_args: |
+            --model claude-sonnet-4-6
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*),Bash(gh api:*)"
+
           # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
           # or https://code.claude.com/docs/en/cli-reference for available options
-
