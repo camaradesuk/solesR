@@ -8,7 +8,7 @@
 An object of class \code{data.frame} with 82 rows and 4 columns.
 }
 \usage{
-field_codes_pubmed
+data(field_codes_pubmed)
 }
 \description{
 Field conversion codes for pubmed imports

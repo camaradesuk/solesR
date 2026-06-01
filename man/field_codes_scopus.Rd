@@ -8,7 +8,7 @@
 An object of class \code{tbl_df} (inherits from \code{tbl}, \code{data.frame}) with 55 rows and 4 columns.
 }
 \usage{
-field_codes_scopus
+data(field_codes_scopus)
 }
 \description{
 Field conversion codes for scopus imports
