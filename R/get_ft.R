@@ -1,218 +1,512 @@
-#' Download full texts
+#' Retrieve full text documents
 #'
-#' This function downloads the full text of included citations
+#' Retrieve full texts as PDF or XML for SOLES.
 #'
-#' @param con connection to db - note that this must contain tables of the format 'type_tag' and dictionaries of the type type_dictionary
-#' @param path pdf folder
-#' @param n number of full text publications to download
-#' @param class_date screening date to filter by
-#' @param class_name screening name to filter by
-#' @param check_failed logical; check failed pdfs again?
-#' @param email email address required for UnPaywall
-#' @import dplyr
+#' @param con Database connection
+#' @param pdf_source where to retrieve PDFs from, options = c("unpaywall", "crossref", "wiley") OR NULL
+#' @param xml_source where to retrieve XMLs from, options = c("epmc", "elsevier") OR NULL
+#' @param ft_path folder where full texts should be downloaded to
+#' @param retMax maximum number of full texts to attempt to retrieve; max = 500; dault = 500
+#' @param check_failed logical, whether to check DOIs that previously failed; default = FALSE
+#' @param timespan timespan for check_failed in format digit(week/month) e.g. "2month"
+#' @param wiley_token API token required to retrieve from Wiley
+#' @param elsevier_token API token required to retrieve from Elsevier
+#' @param unpaywall_email Your email, required to retrieve from Unpaywall
+#'
+#' @return summary of retrieval wrritten to database
 #' @export
+#' 
+#' @import DBI
+#' @import dplyr
 #'
-
-get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_failed=FALSE, email = ""){
+get_ft <- function(con, pdf_source = c("unpaywall", "crossref", "wiley"), xml_source = c("epmc", "elsevier"), ft_path, retMax = 500, check_failed = FALSE, timespan = NULL, wiley_token = NULL, elsevier_token = NULL, unpaywall_email = NULL){
   
-  # Get citation data --------
-  # get dois
-  dois <- tbl(con, "unique_citations") %>% select(doi, uid) %>% filter(!is.na(doi))
-  
-  if(check_failed == TRUE){
-    
-    ft_found <- tbl(con, "full_texts") %>% filter(status == "found")
-    
-  } else{
-    
-    # get list of full texts already searched for
-    ft_found <- tbl(con, "full_texts")
-    
+  # Check con is exists
+  if(!inherits(con, "PqConnection")){
+    stop("'con' is not a valid database connection")
   }
   
-  # get included studies with no full text
-  included_no_ft <- tbl(con, "study_classification") %>% filter(decision=="include") %>% select(uid, date, name) %>% distinct() %>%
-    left_join(dois, by="uid") %>% anti_join(ft_found, by="doi") %>% collect()
-  
-  # remove missing dois
-  included_no_ft <- included_no_ft %>% filter(!is.na(doi)) %>% filter(!doi == "")
-  
-  # apply filters for screening date
-  if(!is.null(class_date)){
-    
-    included_no_ft <- included_no_ft %>%
-      filter(date == class_date)
-  }
-  
-  # apply filters for screening name
-  if(!is.null(class_name)){
-    
-    included_no_ft <- included_no_ft %>%
-      filter(name == class_name)
-  }
-  
-  # make sure DOIs aren't duplicated
-  included_no_ft <- included_no_ft[!duplicated(included_no_ft$doi),]
-  
-  # get number of missing full texts
-  n_missing <- nrow(included_no_ft)
-  
-  # If no texts missing, return messages to the user
-  if (n_missing == 0){
-    
-    message("No more pdf files left to find!")
-    message("All pdf files have either been \"found\",\"failed\" or have a mising DOI")
-    message("Try check_failed = TRUE to download more pdf files.")
-    return()
-  }
-  
-  # if N specified, subset
-  if(!is.null(n)){
-    
-    # if specified subset n is larger than the number to find then n becomes n_missing
-    if (n_missing < n){
-      
-      n <- n_missing
-      message("Only ", n, " full texts to find from included studies")
-      
+  # Check pdf_source options are valid or NULL
+  if(!is.null(pdf_source)){
+    if (!(all(pdf_source %in% c("unpaywall", "crossref", "wiley")))) {
+      stop("'pdf_source' is invalid, options are: 'unpaywall', 'crossref', 'wiley' or NULL")
     }
-    
-    to_find <- included_no_ft[sample(nrow(included_no_ft), n), ]
-    message("Trying to find ", n, " full texts from included studies.")
-    
-  } else if(nrow(included_no_ft) > 100){
-    message("You have attempted to retrieve PDFs for ", n_missing, " records. Only processing the first 100 records.")
-    to_find <- included_no_ft[1:100,]
-    
-  } else if(nrow(included_no_ft)==0){
-    
-    return()
-    
-  } else{
-    
-    to_find <- included_no_ft
-    
   }
   
-  # Unpawywall --------
-  # try unpaywall using dois
-  message("trying Unpaywall...")
-  
-  try(upw_res <- suppressWarnings(suppressMessages(roadoi::oadoi_fetch(dois = to_find$doi, email=email))),silent=TRUE)
-  
-  if(exists("upw_res")){
-    # remove wiley, elsiever, sage to avoid errors
-    upw_res <- upw_res %>%
-      select(best_oa_location, doi, oa_status, publisher) %>%
-      tidyr::unnest(cols = c(best_oa_location)) %>%
-      filter(!publisher %in% c("Wiley", "Elsevier BV", "SAGE Publications")) %>% 
-      filter(!grepl("tandfonline",url))
-    
-    # link back to get uid
-    upw_res <- left_join(upw_res, included_no_ft, by="doi")
-    
-    # write path for pdf download
-    upw_res <- upw_res %>%
-      mutate(doi_fixed = doi)
-    
-    # fix doi slash to dollar sign
-    upw_res$doi_fixed  <- fix_illegal_chars(upw_res$doi_fixed)
-    
-    # Fix if pdf url column is missing
-    if (!"url_for_pdf" %in% colnames(upw_res)) {
-      upw_res <- upw_res %>%
-        rename(url_for_pdf = url)  
+  # Check xml_source options are valid or NULL
+  if(!is.null(xml_source)){
+    if (!(all(xml_source %in% c("epmc", "elsevier")))) {
+      stop("'pdf_source' is invalid, options are: 'epmc', 'elsevier' or NULL")
     }
-    
-    upw_res <- upw_res %>%
-      mutate(pdf = paste0(path, "/", doi_fixed, ".pdf")) %>%
-      filter(!is.na(url_for_pdf))
-    
-    
-  } else {
-    upw_res <- NULL}
+  }
   
-  message(paste(nrow(upw_res), "full texts found via Unpaywall! Attempting download..."))
+  # Check tokens and emails exist if required
+  if("unpaywall" %in% pdf_source & is.null(unpaywall_email)){
+    stop("Cannot retrieve using unpaywall if unpaywall_email argument is missing")
+  }
+  if("wiley" %in% pdf_source & is.null(wiley_token)){
+    stop("Cannot retrieve using wiley if wiley_token argument is missing")
+  }
+  if("elsevier" %in% pdf_source & is.null(elsevier_token)){
+    stop("Cannot retrieve using elsevier if elsevier_token argument is missing")
+  }
   
-  urls <- upw_res$url_for_pdf
-  dest <- upw_res$pdf
+  # If ft_path does not exist, create it
+  if(!dir.exists(ft_path)){
+    dir.create(ft_path)
+    message("file path created for Unpaywall full texts: ", ft_path)
+  }
   
-  # Download texts from Unpaywall
-  for (i in 1:length(urls)) {
-    tryCatch(
-      {
-        
-        download.file(urls[i], dest[i])
-        cat("Downloaded:", urls[i], "\n")
-        
-        
-      },
-      error = function(e) {
-        cat("Error occurred while downloading:", urls[i], "\n")
-        
-      },
-      warning = function(w) {
-        
-        cat("Warning occurred while downloading:", urls[i], "\n")
-        if (file.exists(dest[i])) {
-          
-          file_size <- file.size(dest[i])
-          
-          if (file_size == 0){
-            
-            file.remove(dest[i])
-            
-          }
-          
-        }
-        
+  # Check if retMax is a positive integer and exit if not
+  if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
+    stop("retMax is not a whole number")
+  }
+  
+  # Check retMax and exit if above maximum
+  if (retMax > 500) {
+    stop("retMax is too high, max is 500")
+  }
+  
+  # Check check_failed is Boolean
+  if (is.logical(check_failed) == FALSE) {
+    stop(message("check_soles argument should be set to TRUE or FALSE, default is FALSE"))
+  }
+  
+  # If check failed is used
+  if(isTRUE(check_failed)){
+    # Check timespan is given
+    if(is.null(timespan)){
+      stop("to check failed, use tmespan argument")
+    }
+    # Check timepsan is valid
+    if (grepl("^(?i)\\d+(week|month)$", timespan) == FALSE) {
+      stop("timespan format incorrect, should contain digit and week or month, e.g. `2month`")
+    }
+    # Define timespan for retrieval
+    if (grepl("(?i)week", timespan) == TRUE) {
+      # Get number of weeks by removing non-digit characters
+      x <- as.numeric(gsub("\\D", "", timespan))
+      # Assign date as x number of weeks before today's date
+      retrieval_date <- Sys.Date() - 7 * x
+    } else if (grepl("(?i)month", timespan) == TRUE) {
+      # Get number of months by removing non-digit characters
+      x <- as.numeric(gsub("\\D", "", timespan))
+      # Assign date as x number of months before today's date
+      retrieval_date <- Sys.Date() - 31 * x
+    }
+    message("Rechecking DOIs previously checked before ", retrieval_date)
+  }
+  
+  # If full_texts table exists, read it in
+  if (dbExistsTable(con, "full_texts")){
+    ft_found <- DBI::dbReadTable(con, "full_texts") %>%
+      dplyr::filter(status == "found")
+    if(isTRUE(check_failed)){
+      ft_found <- ft_found %>%
+        dplyr::filter(date > retrieval_date) %>%
+        dplyr:filter(status == "found")
+    }
+  } else{
+    # Create empty dataframe
+    ft_found <- data.frame(doi = as.character())
+  }
+  
+  # Read in DOI data
+  dois <- dplyr::tbl(con, "unique_citations") %>%  
+    dplyr::select(doi, uid) %>%
+    dplyr::left_join(dplyr::tbl(con, "study_classification"), by = "uid") %>%
+    dplyr::filter(decision == "include",
+                  !is.na(doi)) %>%
+    dplyr::select(doi) %>%
+    dplyr::distinct() %>%
+    collect()
+  
+  # Filter not found
+  dois <- dois %>%
+    dplyr::filter(!doi %in% ft_found$doi)
+  
+  
+  # Get max number of dois to retrieve full texts for
+  if(nrow(dois) < 1){
+    stop("No more full texts to retrieve!")
+  } else if(nrow(dois) > retMax){
+    message(nrow(dois), " full texts to retrieve; limiting to first ", retMax)
+    dois <- head(dois, retMax)
+  } else{
+    message(nrow(dois), " full texts to retrieve")
+  }
+  
+  # Create overall results 
+  ft_summary_all <- NULL
+  
+  # If pdf_source is not null, retrieve PDFs
+  if(!is.null(pdf_source)){
+    
+    # Get list of dois to retrieve
+    dois_pdf <- dois$doi
+    
+    # Create empty results
+    pdf_summary <- NULL
+    
+    # retrieve using unpaywall
+    if("unpaywall" %in% pdf_source){
+      message("Trying unpaywall...")
+      for(i in 1:length(dois_pdf)){
+        message("Trying DOI ", i, " of ", length(dois_pdf), " in unpaywall")
+        pdf_summary_new <- ft_unpaywall(dois_pdf[i], unpaywall_email = unpaywall_email, ft_path = ft_path, ft_name_style = "doi")
+        pdf_summary <- rbind(pdf_summary, pdf_summary_new)
+        Sys.sleep(1)
       }
-    )
+      # Remove not found from summary
+      pdf_summary <- pdf_summary %>%
+        # Remove where no file path, therefore no file
+        dplyr::filter(!is.na(path))
+      message(nrow(pdf_summary), " files found from unpaywall")
+      # Remove from doi list where file found
+      dois_pdf <- dois_pdf[!dois_pdf %in% pdf_summary$doi]
+      message("Finished unpaywall: ", length(dois_pdf), " full texts left to find")
+    }
+    
+    # retrieve using crossref
+    if("crossref" %in% pdf_source & length(dois_pdf) > 0){
+      message("Trying crossref...")
+      for(i in 1:length(dois_pdf)){
+        message("Trying DOI ", i, " of ", length(dois_pdf), " in crossref")
+        pdf_summary_new <- ft_crossref(dois_pdf[i], ft_path = ft_path, ft_name_style = "doi")
+        pdf_summary <- rbind(pdf_summary, pdf_summary_new)
+        Sys.sleep(1)
+      }
+      # Remove not found from summary
+      pdf_summary <- pdf_summary %>%
+        # Remove where no file path, therefore no file
+        dplyr::filter(!is.na(path))
+      message(nrow(pdf_summary), " files found from crossref")
+      # Remove from doi list where file found
+      dois_pdf <- dois_pdf[!dois_pdf %in% pdf_summary$doi]
+      message("Finished crossref: ", length(dois_pdf), " full texts left to find")
+    }
+    
+    # retrieve using wiley
+    if("wiley" %in% pdf_source & length(dois_pdf)> 0){
+      message("Trying wiley...")
+      for(i in 1:length(dois_pdf)){
+        message("Trying DOI ", i, " of ", length(dois_pdf), " in wiley")
+        pdf_summary_new <- ft_wiley(dois_pdf[i], wiley_token = wiley_token, ft_path = ft_path, ft_name_style = "doi")
+        pdf_summary <- rbind(pdf_summary, pdf_summary_new)
+        Sys.sleep(1)
+      }
+      # Remove not found from summary
+      pdf_summary <- pdf_summary %>%
+        # Remove where no file path, therefore no file
+        dplyr::filter(!is.na(path))
+      message(nrow(pdf_summary), " files found from wiley")
+      # Remove from doi list where file found
+      dois_pdf <- dois_pdf[!dois_pdf %in% pdf_summary$doi]
+      message("Finished wiley: ", length(dois_pdf), " full texts left to find")
+    }
+    
+    # Add to overall results
+    ft_summary_all <- rbind(ft_summary_all, pdf_summary)
+  }
+  
+  # If pdf_source is not null, retrieve PDFs
+  if(!is.null(xml_source)){
+    
+    # Get list of dois to retrieve
+    dois_xml <- dois$doi
+    
+    # Create empty results
+    xml_summary <- NULL
+    
+    # retrieve using epmc
+    if("epmc" %in% xml_source){
+      message("Trying epmc...")
+      for(i in 1:length(dois_xml)){
+        message("Trying DOI ", i, " of ", length(dois_xml), " in epmc")
+        xml_summary_new <- ft_epmc(dois_xml[i], ft_path = ft_path, ft_name_style = "doi")
+        xml_summary <- rbind(xml_summary, xml_summary_new)
+        Sys.sleep(1)
+      }
+      # Remove not found from summary
+      xml_summary <- xml_summary %>%
+        # Remove where no file path, therefore no file
+        dplyr::filter(!is.na(path))
+      message(nrow(xml_summary), " files found from epmc")
+      # Remove from doi list where file found
+      dois_xml <- dois_xml[!dois_xml %in% xml_summary$doi]
+      message("Finished epmc: ", length(dois_xml), " full texts left to find")
+    }
+    
+    # retrieve using elsevier
+    if("elsevier" %in% xml_source & length(dois_xml) > 0){
+      message("Trying elsevier...")
+      for(i in 1:length(dois_xml)){
+        message("Trying DOI ", i, " of ", length(dois_xml), " in elsevier")
+        xml_summary_new <- ft_elsevier(dois_xml[i], elsevier_token = elsevier_token, ft_path = ft_path, ft_name_style = "doi")
+        xml_summary <- rbind(xml_summary, xml_summary_new)
+        Sys.sleep(1)
+      }
+      # Remove not found from summary
+      xml_summary <- xml_summary %>%
+        # Remove where no file path, therefore no file
+        dplyr::filter(!is.na(path))
+      message(nrow(xml_summary), " files found from elsevier")
+      # Remove from doi list where file found
+      dois_xml <- dois_xml[!dois_xml %in% xml_summary$doi]
+      message("Finished elsevier: ", length(dois_xml), " full texts left to find")
+    }
+    
+    # Add to overall results
+    ft_summary_all <- rbind(ft_summary_all, xml_summary)
     
   }
   
-  # CrossRef -------
-  message("trying CrossRef....")
-  pdfs_found_now <- get_dois_with_ft(path)
+  # if results still null, do file found
+  if(is.null(ft_summary_all)){
+    message("no full texts found")
+  }
   
-  # correction to make lower - DOI not always in same case!
-  still_missing <- to_find %>% filter(!(tolower(doi) %in% tolower(pdfs_found_now)))
+  # Summarise not found
+  ft_summary_not_found <- dois %>%
+    dplyr::filter(!doi %in% ft_summary_all$doi) %>%
+    dplyr::mutate(status = "failed",
+                  doi_encoded = URLencode(doi, reserved = TRUE),
+                  method = NA,
+                  path = NA,
+                  ft_ext = NA,
+                  date = Sys.Date()) %>%
+    select(status, doi_encoded, doi, method, path, ft_ext, date)
   
-  try(cr_res <- suppressWarnings(suppressMessages(rcrossref::cr_works(dois = still_missing$doi))), silent=TRUE)
+  # Combine previously found, found now, and not found
+  ft_summary_all <- rbind(ft_found, ft_summary_all, ft_summary_not_found)
   
-  if(exists("cr_res")){
-    df <- cr_res$data
-    df <- left_join(df, to_find, by="doi")
-    df <- df %>% select(doi, uid, link) %>% tidyr::unnest(cols = c(link))
-    df <- df %>%
-      mutate(name = doi)
+  # Write to database
+  DBI::dbWriteTable(con, "full_texts", ft_summary_all, overwrite = TRUE)
+  
+}
+
+
+
+#' Retrieve PDF documents from Unpaywall using DOI
+#'
+#' @param doi character string containing DOI
+#' @param uid optional unique ID for file naming
+#' @param unpaywall_email your email, required for retrieve from Unpaywall
+#' @param ft_path folder where PDFs should be downloaded
+#' @param ft_name_style naming style for PDFs; options = c("doi", "uid")
+#'
+#' @return dataframe summary of retrieval
+#' @export
+#' 
+#' @import roadoi
+#' @import tidyr
+#' @import utils
+#' @import dplyr
+#'
+ft_unpaywall <- function(doi, uid, unpaywall_email, ft_path, ft_name_style = "doi"){
+  
+  # Check DOI is character
+  if(is.character(doi) == FALSE | is.character(unpaywall_email) == FALSE){
+    stop(message("doi, and unpaywall_email should all be character strings"))
+  }
+  
+  # Check ft_path exists
+  if(!dir.exists(ft_path)){
+    dir.create(ft_path)
+    message("file path created for full texts: ", ft_path)
+  }
+  
+  # URL encode the DOI
+  doi_encoded <- utils::URLencode(doi, reserved = TRUE)
+  
+  # Check ft_name_style is valid
+  if(ft_name_style == "uid"){
+    ft_name = uid
+  } else if(ft_name_style == "doi"){
+    ft_name = doi_encoded
+  } else{
+    stop("ft_name_style should be 'doi' or 'uid'; default is doi")
+  }
+  
+  # Query DPI using DOI
+  try(res <- suppressWarnings(
+    suppressMessages(
+      roadoi::oadoi_fetch(dois = doi, email = unpaywall_email))),silent=TRUE)
+  # If response given
+  if(exists("res")){
+    # remove wiley, elsiever, sage to avoid errors
+    df <- res %>%
+      # Select columns
+      select(best_oa_location, doi, oa_status, publisher) %>%
+      # Unnest columns
+      tidyr::unnest(cols = c(best_oa_location))
+    if(nrow(df) > 0){
+      df <- df %>%
+        mutate(path = paste0(ft_path, "/", ft_name, ".pdf")) %>%
+        # Remove big publishers
+        filter(!publisher %in% c("Wiley", "Elsevier BV", "SAGE Publications")) %>% 
+        filter(!grepl("tandfonline",url)) %>%
+        rename(doi_encoded = doi) %>%
+        mutate(doi_encoded = utils::URLencode(doi_encoded, reserved = TRUE))
+      # Fix if pdf url column is missing
+      if (!"url_for_pdf" %in% colnames(df)) {
+        df <- df %>%
+          rename(url_for_pdf = url)
+      }
+      # Create file path
+      df <- df %>%
+        filter(!is.na(url_for_pdf)) %>%
+        filter(grepl("\\.pdf$", url_for_pdf))
+      # Check still result after filtering
+      if(nrow(df) > 0) {
+        # Extract PDF URL and file destination
+        upw_urls <- df$url_for_pdf
+        upw_dest <- df$path
+        
+        # Download PDFs using CrossRef URL
+        for (i in 1:length(upw_urls)) {
+          tryCatch(
+            {
+              # Download file
+              download.file(upw_urls[i], upw_dest[i])
+              # Print success message
+              message(sprintf("Found unpaywall PDF for DOI '%s'", doi))
+            },
+            error = function(e) {
+              # Print error message
+              message(sprintf("Not found unpaywall PDF for DOI '%s'", doi))
+              
+            },
+            warning = function(w) {
+              # Check if file exists
+              if (file.exists(upw_dest[i])) {
+                # Get file size
+                file_size <- file.size(upw_dest[i])
+                # If file size is zxero, remove
+                if (file_size == 0){
+                  file.remove(upw_dest[i])
+                  # Print warning message
+                  message(sprintf("File size error in PDF for DOI '%s'", doi))
+                }
+              }
+            }
+          )
+        }
+      } else{
+        message(sprintf("Not found unpaywall PDF for DOI '%s'", doi))
+      }
+    } else{
+      message(sprintf("Not found unpaywall PDF for DOI '%s'", doi))
+    }
+    # Keep only files that actually exist (after download)
+    if ("path" %in% names(df)){
+      df_valid <- df[file.exists(df$path), ]
+    } else{
+      df_valid <- data.frame()
+    }
     
-    df$name  <- fix_illegal_chars(df$name)
+    # If at least one file was successfully downloaded
+    if (nrow(df_valid) > 0) {
+      ft_summary <- data.frame(
+        status = "found",
+        doi = doi,
+        doi_encoded = doi_encoded,
+        method = "unpaywall",
+        path = df_valid$path[1],
+        ft_ext = tools::file_ext(df_valid$path[1]),
+        date = Sys.Date()
+      )
+    } else {
+      # No valid files downloaded
+      ft_summary <- data.frame(
+        status = "failed",
+        doi = doi,
+        doi_encoded = doi_encoded,
+        method = "unpaywall",
+        path = NA,
+        ft_ext = NA,
+        date = Sys.Date()
+      )
+    }
+  } else{
+    # Print error message
+    message(sprintf("Not found unpaywall PDF for DOI '%s'", doi))
+    # Generate summary
+    ft_summary <- data.frame(
+      status = "failed",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "unpaywall",
+      path = NA,
+      ft_ext = NA,
+      date = Sys.Date()
+    )
+  }
+  # Return summary
+  return(ft_summary)
+}
+
+
+#' Retrieve PDF documents from Crossref using DOI
+#'
+#' @param doi character string containing DOI
+#' @param uid optional unique ID for file naming
+#' @param ft_path folder where PDFs should be downloaded
+#' @param ft_name_style naming style for PDFs; options = c("doi", "uid")
+#'
+#' @return dataframe summary of retrieval
+#' @export
+#' 
+#' @import rcrossref
+#' @import utils
+#' @import tidyr
+#' @import dplyr
+#'
+ft_crossref <- function(doi, uid, ft_path, ft_name_style = "doi"){
+  
+  # Check DOI is character
+  if(is.character(doi) == FALSE){
+    stop(message("doi should be character strings"))
+  }
+  
+  # Check ft_path exists
+  if(!dir.exists(ft_path)){
+    dir.create(ft_path)
+    message("file path created for full texts: ", ft_path)
+  }
+  
+  # URL encode the DOI
+  doi_encoded <- utils::URLencode(doi, reserved = TRUE)
+  
+  # Check ft_name_style is valid
+  if(ft_name_style == "uid"){
+    ft_name = uid
+  } else if(ft_name_style == "doi"){
+    ft_name = doi_encoded
+  } else{
+    stop("ft_name_style should be 'doi' or 'uid'; default is doi")
+  }
+  
+  # Query API
+  try(res <- suppressWarnings(
+    suppressMessages(
+      rcrossref::cr_works(dois = doi_encoded))), silent=TRUE)
+  # If response given
+  if(exists("res") && "link" %in% names(res$data)){
+    # Get data
+    df <- res$data %>%
+      dplyr::select(name = doi, link) %>%
+      dplyr::mutate(name = utils::URLencode(name, reserved = TRUE)) %>%
+      tidyr::unnest(cols = c(link)) %>%
+      dplyr::mutate(content.type = ifelse(content.type == "unspecified" & grepl("pdf", URL), "pdf", content.type)) %>%
+      dplyr::filter(grepl("pdf", content.type)) %>%
+      dplyr::mutate(
+        path = paste0(ft_path, "/", ft_name, ".pdf")
+      ) %>%
+      dplyr::select(name, URL, content.type, path) %>%
+      dplyr::distinct()
     
-    df <- df %>%
-      mutate(content.type = ifelse(content.type == "unspecified" & grepl('pdf', URL), "pdf", content.type)) %>%
-      mutate(ft_path=ifelse(grepl('pdf',content.type), paste0(path, "/", name, ".pdf"), as.character(name))) %>%
-      mutate(ft_path=ifelse(grepl('text',content.type), paste0(path, "/", name, ".txt"), as.character(ft_path))) %>%
-      mutate(ft_path=ifelse(grepl('xml',content.type), paste0(path, "/", name, ".xml"), as.character(ft_path))) %>%
-      mutate(ft_path = ifelse(grepl('xml$', URL), paste0(path, "/", name, ".xml"), as.character(ft_path))) %>%
-      filter(!content.type == "unspecified")
-    
-    # Filter rows with content type "text/html"
-    html_rows <- df %>%
-      filter(content.type == "text/html")
-    
-    # Filter rows with content type "pdf"
-    pdf_rows <- df %>%
-      filter(grepl("pdf", content.type))
-    
-    # Identify ids with both "text/html" and "pdf"
-    ids_with_both <- intersect(html_rows$doi, pdf_rows$doi)
-    
-    # Remove rows with content type "text/html" where corresponding doi also has "pdf"
-    df <- df %>%
-      filter(!(doi %in% ids_with_both & content.type == "text/html"))
-    
-    # filter out elsiever / wiley / acs (warnings)
+    # filter out big publishers (typically give warnings)
     df <- df %>%
       filter(!grepl("elsevier",URL)) %>%
       filter(!grepl("wiley",URL)) %>%
@@ -220,233 +514,362 @@ get_ft <- function(con, path, n=NULL, class_date=NULL, class_name=NULL, check_fa
       filter(!grepl("sagepub",URL)) %>% 
       filter(!grepl("tandfonline",URL))
     
-    
-  } else {df <- NULL}
-  
-  message(paste(length(unique(df$doi))), " full texts found via CrossRef! Attempting download....")
-  
-  cr_urls <- df$URL
-  cr_dest <- df$ft_path
-  
-  # Download texts from CrossRef
-  for (i in 1:length(cr_urls)) {
-    tryCatch(
-      {
-        Sys.sleep(2)
-        download.file(cr_urls[i], cr_dest[i])
-        
-        cat("Downloaded:", cr_urls[i], "\n")
-      },
-      error = function(e) {
-        cat("Error occurred while downloading:", cr_urls[i], "\n")
-        
-      },
-      warning = function(w) {
-        cat("Warning occurred while downloading:", cr_urls[i], "\n")
-        if (file.exists(cr_dest[i])) {
-          
-          file_size <- file.size(cr_dest[i])
-          
-          if (file_size == 0){
+    # check still result after filtering
+    if(nrow(df) > 0){
+      # Extract PDF URL and file destination
+      cr_urls <- df$URL
+      cr_dest <- df$path
+      
+      # Download PDFs using CrossRef URL
+      for (i in 1:length(cr_urls)) {
+        tryCatch(
+          {
+            # Download file
+            download.file(cr_urls[i], cr_dest[i])
+            # Print success message
+            message(sprintf("Found crossRef PDF for DOI '%s'", doi))
+          },
+          error = function(e) {
+            # Print error message
+            message(sprintf("Not found crossRef PDF for DOI '%s'", doi))
             
-            file.remove(cr_dest[i])
-            
+          },
+          warning = function(w) {
+            # Check if file exists
+            if (file.exists(cr_dest[i])) {
+              # Get file size
+              file_size <- file.size(cr_dest[i])
+              # If file size is zxero, remove
+              if (file_size == 0){
+                file.remove(cr_dest[i])
+                # Print warning message
+                message(sprintf("File size error in PDF for DOI '%s'", doi))
+              }
+            }
           }
-          
-        }
+        )
       }
+    } else{
+      message(sprintf("Not found crossRef PDF for DOI '%s'", doi))
+    }
+    # Keep only files that actually exist (after download)
+    df_valid <- df[file.exists(df$path), ]
+    
+    # If at least one file was successfully downloaded
+    if (nrow(df_valid) > 0) {
+      ft_summary <- data.frame(
+        status = "found",
+        doi = doi,
+        doi_encoded = doi_encoded,
+        method = "crossref",
+        path = df_valid$path[1],
+        ft_ext = tools::file_ext(df_valid$path[1]),
+        date = Sys.Date()
+      )
+    } else {
+      # No valid files downloaded
+      ft_summary <- data.frame(
+        
+        status = "failed",
+        doi = doi,
+        doi_encoded = doi_encoded,
+        method = "crossref",
+        path = NA,
+        ft_ext = NA,
+        date = Sys.Date()
+      )
+    }
+  } else{
+    # Print error message
+    message(sprintf("Not found crossRef PDF for DOI '%s'", doi))
+    # Generate summary
+    ft_summary <- data.frame(
+      status = "failed",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "crossref",
+      path = NA,
+      ft_ext = NA,
+      date = Sys.Date()
+    )
+  }
+  # Return summary
+  return(ft_summary)
+}
+
+
+#' Retrieve PDF documents from Wiley using DOI
+#'
+#' @param doi character string containing DOI
+#' @param uid optional unique ID for file naming
+#' @param wiley_token API key required for text data mining on Wiley texts
+#' @param ft_path folder where PDFs should be downloaded
+#' @param ft_name_style naming style for PDFs; options = c("doi", "uid")
+#'
+#' @return dataframe summary of retrieval
+#' @export
+#' 
+#' @import httr
+#' @import utils
+#' @import dplyr
+#'
+ft_wiley <- function(doi, uid, wiley_token, ft_path, ft_name_style = "doi"){
+  
+  # Check DOI is character
+  if(is.character(doi) == FALSE | is.character(wiley_token) == FALSE){
+    stop(message("doi and wiley_token should all be character strings"))
+  }
+  
+  # Check ft_path exists
+  if(!dir.exists(ft_path)){
+    dir.create(ft_path)
+    message("file path created for full texts: ", ft_path)
+  }
+  
+  # URL encode the DOI
+  doi_encoded <- utils::URLencode(doi, reserved = TRUE)
+  
+  # Check ft_name_style is valid
+  if(ft_name_style == "uid"){
+    ft_name = uid
+  } else if(ft_name_style == "doi"){
+    ft_name = doi_encoded
+  } else{
+    stop("ft_name_style should be 'doi' or 'uid'; default is doi")
+  }
+  
+  # Query DPI using DOI
+  res <- httr::GET(paste0(url = "https://api.wiley.com/onlinelibrary/tdm/v1/articles/", doi),
+                   httr::add_headers(`Wiley-TDM-Client-Token` = wiley_token))
+  
+  # If successful
+  if(httr::status_code(res) == 200){
+    # Retrieve PDF and save using naming convention
+    res <- httr::GET(paste0(url = "https://api.wiley.com/onlinelibrary/tdm/v1/articles/", doi),
+                     httr::add_headers(`Wiley-TDM-Client-Token` = wiley_token),
+                     httr::write_disk(paste0(ft_path, "/", ft_name, ".pdf"), overwrite=TRUE))
+    # Show success message
+    message(sprintf("Found wiley PDF for DOI '%s'", doi))
+    # Generate summary data frme
+    ft_summary <- data.frame(
+      status = "found",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "wiley",
+      path = paste0(ft_path, "/", ft_name, ".pdf"),
+      ft_ext = "pdf",
+      date = Sys.Date()
+    )
+  } else{
+    # Show error
+    message(sprintf("No wiley PDF found for DOI '%s'", doi))
+    # Generate summary
+    ft_summary <- data.frame(
+      status = "failed",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "wiley",
+      path = NA,
+      ft_ext = NA,
+      date = Sys.Date()
+    )
+  }
+  # Return summary
+  return(ft_summary)
+}
+
+
+#' Retrieve XML documents from Wiley using DOI
+#'
+#' @param doi character string containing DOI
+#' @param uid optional unique ID for file naming
+#' @param elsevier_token API key required for text data mining on Elsevier texts
+#' @param ft_path folder where XMLs should be downloaded
+#' @param ft_name_style naming style for XMLs; options = c("doi", "uid")
+#'
+#' @return dataframe summary of retrieval
+#' @export
+#' 
+#' @import httr
+#' @import utils
+#' @import dplyr
+#'
+ft_elsevier <- function(doi, uid, elsevier_token, ft_path, ft_name_style = "doi"){
+  
+  # Check DOI is character
+  if(is.character(doi) == FALSE | is.character(elsevier_token) == FALSE){
+    stop(message("doi and elsevier_token should all be character strings"))
+  }
+  
+  # Check ft_path exists
+  if(!dir.exists(ft_path)){
+    dir.create(ft_path)
+    message("file path created for full texts: ", ft_path)
+  }
+  
+  # URL encode the DOI
+  doi_encoded <- utils::URLencode(doi, reserved = TRUE)
+  
+  # Check ft_name_style is valid
+  if(ft_name_style == "uid"){
+    ft_name = uid
+  } else if(ft_name_style == "doi"){
+    ft_name = doi_encoded
+  } else{
+    stop("ft_name_style should be 'doi' or 'uid'; default is doi")
+  }
+  
+  # Query DPI using DOI
+  res <- httr::GET(paste0(url = "https://api.elsevier.com/content/article/doi/", doi_encoded),
+                   httr::add_headers(`X-ELS-APIKey` = elsevier_token))
+  
+  # If successful
+  if(httr::status_code(res) == 200){
+    # Retrieve XML and save using naming convention
+    res <- httr::GET(paste0(url = "https://api.elsevier.com/content/article/doi/", doi_encoded),
+                     httr::add_headers(`X-ELS-APIKey` = elsevier_token, Accept = ""),
+                     httr::write_disk(paste0(ft_path, "/", ft_name, ".xml"), overwrite=TRUE))
+    # Show success message
+    message(sprintf("Found elsevier XML for DOI '%s'", doi))
+    # Generate summary data frme
+    ft_summary <- data.frame(
+      status = "found",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "elsevier",
+      path = paste0(ft_path, "/", ft_name, ".xml"),
+      ft_ext = "xml", date = Sys.Date()
+    )
+  } else{
+    # Show error
+    message(sprintf("No elsevier XML found for DOI '%s'", doi))
+    # Generate summary
+    ft_summary <- data.frame(
+      status = "failed",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "elsevier",
+      path = NA,
+      ft_ext = NA,
+      date = Sys.Date()
+    )
+  }
+  # Return summary
+  return(ft_summary)
+}
+
+
+#' Retrieve XML documents from EuropePMC using DOI
+#'
+#' @param doi character string containing DOI
+#' @param uid optional unique ID for file naming
+#' @param ft_path folder where XMLs should be downloaded
+#' @param ft_name_style naming style for XMLs; options = c("doi", "uid")
+#'
+#' @return dataframe summary of retrieval
+#' @export
+#' 
+#' @import rcrossref
+#' @import europepmc
+#' @import xml2
+#' @import utils
+#' @import dplyr
+#'
+ft_epmc <- function(doi, uid, ft_path, ft_name_style = "doi"){
+  
+  # Check DOI is character
+  if(is.character(doi) == FALSE ){
+    stop("doi and elsevier_token should all be character strings")
+  }
+  
+  # Check ft_path exists
+  if(!dir.exists(ft_path)){
+    dir.create(ft_path)
+    message("file path created for full texts: ", ft_path)
+  }
+  
+  # URL encode the DOI
+  doi_encoded <- utils::URLencode(doi, reserved = TRUE)
+  
+  # Check ft_name_style is valid
+  if(ft_name_style == "uid"){
+    ft_name = uid
+  } else if(ft_name_style == "doi"){
+    ft_name = doi_encoded
+  } else{
+    stop("ft_name_style should be 'doi' or 'uid'; default is doi")
+  }
+  
+  # Get pmcids
+  pmcid_id <- tryCatch({
+    # Query crossref
+    result <- rcrossref::id_converter(doi)
+    # get data
+    pmcid_id <- result$records
+    
+    if ("status" %in% colnames(result_df)) {
+      # Error status, create placeholder
+      data.frame(pmcid = NA, pmid = NA, doi = doi)
+    } else {
+      # Select relevant columns
+      result_df %>% select(pmcid, pmid, doi)
+    }
+  }, error = function(e) {
+    # Handle errors from id_converter (e.g. network or API issues)
+    data.frame(pmcid = NA, pmid = NA, doi = doi)
+  })
+  
+  # Filter list with PMCID
+  pmcid_id <- pmcid_id %>%
+    dplyr::filter(!is.na(pmcid))
+  
+  # Continue if pmcids are found
+  if(nrow(pmcid_id) > 0){
+    tryCatch({
+      xml_result <- europepmc::epmc_ftxt(ext_id = pmcid_id$pmcid)
+      # Save as file if it exists
+      xml2::write_xml(xml_result, paste0(ft_path, "/", ft_name, ".xml"))
+      # Write summary
+      ft_summary <- data.frame(
+        doi = doi,
+        doi_encoded = doi_encoded,
+        method = "epmc",
+        path = paste0(ft_path, "/", ft_name, ".xml"),
+        ft_ext = "xml", date = Sys.Date()
+      )
+      # Remove from environment
+      rm(xml_result)
+      # Print message
+      message("Downloaded XML file for pmcid:", pmcid_id$pmcid, " / DOI: ", doi)
+    }, error = function(e) {
+      # Print a message if there's an error
+      message("No XML for for pmcid:", pmcid_id$pmcid, " / DOI: ", doi)
+      # Generate summary
+      ft_summary <- data.frame(
+        status = "found",
+        doi = doi,
+        doi_encoded = doi_encoded,
+        method = "epmc",
+        path = NA,
+        ft_ext = NA,
+        date = Sys.Date()
+      )
+    })
+  } else{
+    message("No PMCID for DOI: ", doi)
+    # Generate summary
+    ft_summary <- data.frame(
+      status = "failed",
+      doi = doi,
+      doi_encoded = doi_encoded,
+      method = "epmc",
+      path = NA,
+      ft_ext = NA,
+      date = Sys.Date()
     )
   }
   
-  # Elsevier --------
-  message("trying Elsevier....")
-  pdfs_found_now <- get_dois_with_ft(path)
-  
-  still_to_find <- to_find %>% filter(!(tolower(doi) %in% tolower(pdfs_found_now)))
-  
-  for(i in 1:length(still_to_find$uid)){
-    
-    try(suppressWarnings(suppressMessages(
-      elsevier_ft(still_to_find[i,"doi"], still_to_find[i,"doi"],  token = Sys.getenv("Elsevier_API"), path=path))), silent=TRUE)
-  }
-  
-  pdfs_found_now <- get_dois_with_ft(path)
-  
-  # check if any new pdfs found in sample
-  found <- still_to_find %>%
-    filter(doi %in% pdfs_found_now)
-  
-  message(paste0("Found ", length(found$uid), " more full texts via Elsevier!"))
-  
-  # Wiley --------
-  message("trying Wiley...")
-  pdfs_found_now <- get_dois_with_ft(path)
-  
-  still_missing <- to_find %>% filter(!(tolower(doi) %in% tolower(pdfs_found_now)))
-  
-  still_missing$doi <- gsub('\\s+', '', still_missing$doi)
-  
-  for(i in 1:length(still_missing$uid)){
-    
-    try(suppressWarnings(suppressMessages(
-      wiley_ft(still_missing[i,"doi"], still_missing[i,"doi"],  token = Sys.getenv("WILEY_API"), path=path))), silent=TRUE)
-  }
-  
-  pdfs_found_now <- get_dois_with_ft(path)
-  
-  # check if any new pdfs found in sample
-  found <- still_missing %>%
-    filter(doi %in% pdfs_found_now)
-  
-  message(paste0("Found ", length(found$uid), " more full texts via Wiley!"))
-  
-  # Write to database -----
-  # get paths
-  pdfs_found_now_path <- get_dois_with_ft(path, remove_ext=FALSE)
-  pdfs_found_now_path <- data.frame(doi = tools::file_path_sans_ext(pdfs_found_now_path),
-                                    file.path = paste0(path, "/", fix_illegal_chars(pdfs_found_now_path)),
-                                    status = "found")
-  
-  # read pdf link table
-  pdfs_checked <- dbReadTable(con, "full_texts")
-  
-  # join with paths
-  pdfs_checked_now <- full_join(pdfs_found_now_path, pdfs_checked, by="doi")
-  
-  pdfs_checked_now <- pdfs_checked_now %>%
-    mutate(path = file.path) %>%
-    mutate(status = ifelse(is.na(status.x), "failed", "found")) %>%
-    select(status, doi, path) %>%
-    distinct()
-  
-  # get failed to add to list
-  add <- to_find %>%
-    filter(!doi %in% pdfs_found_now_path$doi) %>%
-    mutate(status="failed", path=NA) %>%
-    select(status, doi, path)
-  
-  pdfs_checked_now <- rbind(pdfs_checked_now,add) %>%
-    mutate(file_size = file.size(path)) %>%
-    mutate(status = ifelse((file_size == 0 & status == "found"), "found - empty file", status)) %>%
-    select(-file_size)
-  
-  # keep only one file for each doi
-  pdfs_checked_now <- pdfs_checked_now %>%
-    filter(!is.na(doi)) %>%
-    group_by(doi) %>%
-    arrange(desc(path)) %>%
-    slice_head() %>%
-    ungroup() %>%
-    unique()
-  
-  # how many new full texts?
-  n_found <- length(unique(pdfs_checked_now$doi[which(pdfs_checked_now$status=="found")])) - length(unique(pdfs_checked$doi[which(pdfs_checked$status=="found")]))
-  message("Found ", n_found, "/", nrow(to_find), " full texts. Writing to SOLES database...")
-  
-  dbWriteTable(con, "full_texts", pdfs_checked_now, overwrite=TRUE)
+  # Return summary
+  return(ft_summary)
 }
 
-
-get_dois_with_ft <- function(path, remove_ext=TRUE){
-  
-  pdfs_found_now <- list.files(path = path)
-  
-  if(remove_ext==TRUE){
-    
-    pdfs_found_now <- tools::file_path_sans_ext(pdfs_found_now)
-    
-  } else {
-    
-    pdfs_found_now <- pdfs_found_now
-  }
-  
-  pdfs_found_now <- gsub("\\%2F","\\/",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%3C","<",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%3E",">",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%3A",":",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%3B",";",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%22",'"',pdfs_found_now)
-  pdfs_found_now <- gsub("\\%7C","\\|",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%3F","\\?",pdfs_found_now)
-  pdfs_found_now <- gsub("\\%2A","\\*",pdfs_found_now)
-  
-}
-
-fix_illegal_chars <- function(x){
-  
-  x <- gsub("\\/", "%2F", x)
-  x <- gsub("<", "%3C", x)
-  x  <- gsub(">", "%3E", x)
-  x  <- gsub(":", "%3A", x)
-  x <- gsub(";", "%3B", x)
-  x  <- gsub('"', "%22", x)
-  x  <- gsub("\\|", "%7C", x)
-  x  <- gsub("\\?", "%3F", x)
-  x  <- gsub("\\*", "%2A", x)
-  
-  
-}
-
-#' Wiley full text retrieval
-#'
-#'  This function retrieves full texts from Wiley journals
-#' @export
-#' @param doi digital object identifier
-#' @param uid unique identifier for paper
-#' @param token API token
-#' @param path where full texts should be stored
-
-wiley_ft <- function(doi, uid, token, path){
-  
-  doi <- gsub("\\/", "%2F", doi)
-  uid  <- gsub("\\/", "%2F", uid)
-  
-  res <- httr::GET(paste0(url = "https://api.wiley.com/onlinelibrary/tdm/v1/articles/", doi),
-                   httr::add_headers(`Wiley-TDM-Client-Token` = token))
-  
-  if(httr::status_code(res) == 200){
-    
-    res <- httr::GET(paste0(url = "https://api.wiley.com/onlinelibrary/tdm/v1/articles/", doi),
-                     httr::add_headers(`Wiley-TDM-Client-Token` = token),
-                     httr::write_disk(paste0(path, "/", doi, ".pdf"), overwrite=TRUE))
-  } else{
-    
-    message("There is no Wiley API access to this doi")
-  }
-}
-
-
-#' Elsevier full text retrieval
-#'
-#' This function retrieves full texts from Elsevier journals
-#' @export
-#' @param doi digital object identifier
-#' @param uid unique identifier for paper
-#' @param token API token
-#' @param path where full texts should be stored
-elsevier_ft <- function(doi, uid, token, path){
-  doi <- gsub("\\/", "%2F", doi)
-  uid  <- gsub("\\/", "%2F", uid)
-  
-  res <- httr::GET(paste0(url = "https://api.elsevier.com/content/article/doi/", doi),
-                   httr::add_headers(`X-ELS-APIKey` = token))
-  
-  if(httr::status_code(res) == 200){
-    
-    res <- httr::GET(paste0(url = "https://api.elsevier.com/content/article/doi/", doi),
-                     httr::add_headers(`X-ELS-APIKey` = token),
-                     httr::write_disk(paste0(path, "/", uid, ".json"), overwrite=TRUE))
-    
-    file <- jsonlite::fromJSON(paste0(path, "/", uid, ".json"))
-    file_txt <- file[["full-text-retrieval-response"]][["originalText"]]
-    
-    if(!is.null(file_txt)){
-      
-      write.table(file_txt, paste0(path, "/", uid, ".txt"), row.names = FALSE)
-    }
-  } else{
-    
-    message("Elsiever API cannot access this doi")
-  }
-  
-}

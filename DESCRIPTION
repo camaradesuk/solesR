@@ -33,6 +33,7 @@ Imports:
     rcrossref,
     fuzzyjoin,
     XML,
+    xml2,
     openalexR,
     purrr,
     openxlsx,

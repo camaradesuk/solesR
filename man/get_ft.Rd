@@ -2,33 +2,45 @@
 % Please edit documentation in R/get_ft.R
 \name{get_ft}
 \alias{get_ft}
-\title{Download full texts}
+\title{Retrieve full text documents}
 \usage{
 get_ft(
   con,
-  path,
-  n = NULL,
-  class_date = NULL,
-  class_name = NULL,
+  pdf_source = c("unpaywall", "crossref", "wiley"),
+  xml_source = c("epmc", "elsevier"),
+  ft_path,
+  retMax = 500,
   check_failed = FALSE,
-  email = ""
+  timespan = NULL,
+  wiley_token = NULL,
+  elsevier_token = NULL,
+  unpaywall_email = NULL
 )
 }
 \arguments{
-\item{con}{connection to db - note that this must contain tables of the format 'type_tag' and dictionaries of the type type_dictionary}
+\item{con}{Database connection}
 
-\item{path}{pdf folder}
+\item{pdf_source}{where to retrieve PDFs from, options = c("unpaywall", "crossref", "wiley") OR NULL}
 
-\item{n}{number of full text publications to download}
+\item{xml_source}{where to retrieve XMLs from, options = c("epmc", "elsevier") OR NULL}
 
-\item{class_date}{screening date to filter by}
+\item{ft_path}{folder where full texts should be downloaded to}
 
-\item{class_name}{screening name to filter by}
+\item{retMax}{maximum number of full texts to attempt to retrieve; max = 500; dault = 500}
 
-\item{check_failed}{logical; check failed pdfs again?}
+\item{check_failed}{logical, whether to check DOIs that previously failed; default = FALSE}
 
-\item{email}{email address required for UnPaywall}
+\item{timespan}{timespan for check_failed in format digit(week/month) e.g. "2month"}
+
+\item{wiley_token}{API token required to retrieve from Wiley}
+
+\item{elsevier_token}{API token required to retrieve from Elsevier}
+
+\item{unpaywall_email}{Your email, required to retrieve from Unpaywall}
+}
+\value{
+summary of retrieval wrritten to database
 }
 \description{
-This function downloads the full text of included citations
+Retrieve full texts as PDF or XML for SOLES.
 }
