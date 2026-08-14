@@ -2,7 +2,7 @@
 % Please edit documentation in R/search_api.R
 \name{wos_search}
 \alias{wos_search}
-\title{Search Web of Science Core Collection and retrieve bibliographic data using rwoslite}
+\title{Search Web of Science Core Collection and retrieve bibliographic data}
 \usage{
 wos_search(query = NULL, timespan = NULL, format_soles = TRUE)
 }
@@ -17,11 +17,18 @@ wos_search(query = NULL, timespan = NULL, format_soles = TRUE)
 a dataframe containing Web of Science search results
 }
 \description{
-A wrapper function for rwoslite / WOS Lite. Search the Web of Science Core Collection using a query and retrieve results programmatically.
-Requires an API key from the Clarivate Developer Portal (https://developer.clarivate.com/apis/woslite).
-Use the function \code{usethis::edit_r_environ()} to add the key to your ~/.Renviron file.
+Search the Web of Science Core Collection using a query and retrieve results programmatically,
+via the Clarivate Web of Science Starter API (\url{https://developer.clarivate.com/apis/wos-starter}).
+Requires an API key from the Clarivate Developer Portal, stored in the \code{WOS_KEY} environment
+variable (e.g. via \code{Sys.setenv(WOS_KEY = "your-key")} or in your \code{.Renviron} file).
 The timespan should be formatted as a number followed by the word "week" or "month", e.g. "1month" or "2week".
 One week is calculated as 7 days and one month is calculated as 31 days.
+}
+\details{
+Records are retrieved via \code{wos_get_records()}, which pages through the WoS Starter API's
+\code{/documents} endpoint (\url{https://api.clarivate.com/apis/wos-starter/v1/documents}),
+up to a maximum of 2000 records per call. If no records are found for the given query and
+timespan, the function prints a message and returns an empty data frame rather than erroring.
 }
 \examples{
 \dontrun{
