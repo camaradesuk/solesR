@@ -547,3 +547,166 @@ process_found_doi <- function(con, dois_found_file = NULL) {
   message("unique_citations table updated successfully.")
   
 }
+
+#' Fill in missing abstracts from OpenAlex using DOI lookup
+#'
+#' @description
+#' Identifies records in a citation data frame that are missing an
+#' abstract (or have a suspiciously short one), attempts to retrieve
+#' abstract text for those records from OpenAlex using their DOI, and
+#' returns the citation data frame with any newly found abstracts filled
+#' in.
+#'
+#' @param citations a data frame of citation records
+#' @param abstract_col character string, name of the abstract column in
+#'   \code{citations} (default \code{"abstract"})
+#' @param doi_col character string, name of the DOI column in
+#'   \code{citations} (default \code{"doi"})
+#' @param id_col character string, name of the unique identifier column in
+#'   \code{citations} (default \code{"uid"})
+#'
+#' @return a data frame matching the structure of \code{citations}, with
+#'   abstracts filled in for any records where a match was found on
+#'   OpenAlex
+#'
+#' @examples
+#' \dontrun{
+#' new_citations <- get_missing_abstracts_openalex(new_citations)
+#' }
+#'
+#' @export
+#'
+get_missing_abstracts_openalex <- function(citations, abstract_col = "abstract", doi_col = "doi", id_col = "uid") {
+  
+  # Check the required column names exist and stop the function with error if not
+  if (!abstract_col %in% colnames(citations)) {
+    stop("Column ", abstract_col, " does not exist. Is the column name correct?")
+  }
+  
+  if (!doi_col %in% colnames(citations)) {
+    stop("Column ", doi_col, " does not exist. Is the column name correct?")
+  }
+  
+  if (!id_col %in% colnames(citations)) {
+    stop("Column ", id_col, " does not exist. Is the column name correct?")
+  }
+  
+  # Check each record has an ID (no NA values)
+  if (sum(is.na(citations[[id_col]])) > 0) {
+    stop("Column ", id_col, " does not contain a unique identifier for each record. Please ensure each record has a unique identifier.")
+  }
+  # browser()
+  # Rename columns for internal function use
+  citations <- citations %>%
+    rename(abstract := {{ abstract_col }},
+           doi := {{ doi_col }},
+           uid := {{ id_col }}) %>%
+    # Lowercase DOI early so every downstream comparison/join is consistent
+    mutate(doi = tolower(doi))
+  
+  # Subset records that do not have an abstract (or have a suspiciously
+  # short one, e.g. a placeholder string rather than real abstract text)
+  new_unique_no_abstract <- citations %>%
+    filter(stringr::str_length(abstract) < 100 | is.na(abstract))
+  
+  
+  # Print number of records missing an abstract to the console
+  message(nrow(new_unique_no_abstract), " records with no abstract.")
+  
+  new_unique_no_abstract <- new_unique_no_abstract %>%
+    # Remove records without a DOI
+    filter(!is.na(doi)) %>%
+    # Remove empty abstract column
+    select(-abstract)
+  
+  # Print number of records with a DOI
+  message(nrow(new_unique_no_abstract), " records with no abstract have a DOI.")
+  
+  # Stop function if there are no missing abstracts to retrieve
+  if (nrow(new_unique_no_abstract) < 1) {
+    stop("No more abstracts to find!")
+  }
+  
+  # Print process to console
+  message("Trying to retrieve abstracts from OpenAlex using DOI...")
+  
+  # Run function over each row of data missing abstracts, returning a
+  # flat list (doi, uid, abstract) per record so results can be combined
+  # cleanly afterwards
+  abstract_result <- lapply(seq_len(nrow(new_unique_no_abstract)), function(i) {
+    # Get doi and id
+    doi <- new_unique_no_abstract$doi[i]
+    uid <- new_unique_no_abstract$uid[i]
+    
+    # Attempt to retrieve data from OpenAlex
+    tryCatch(
+      {
+        result <- openalexR::oa_fetch(
+          entity = "works",
+          doi = doi
+        )
+        
+        # Pull just the abstract text out of the fetched record;
+        # NA if no match was found
+        abstract_text <- if (!is.null(result) &&
+                             nrow(result) > 0 &&  
+                             "abstract" %in% names(result) &&
+                             !is.na(result$abstract[1])) {
+          
+          message(sprintf("Found abstract for DOI '%s'", doi))
+          result$abstract[1]
+          
+        } else {
+          
+          message(sprintf("No abstract available for DOI '%s'", doi))
+          NA_character_
+          
+        }
+        
+        list(doi = doi, uid = uid, abstract = abstract_text)
+      },
+      error = function(e) {
+        message(sprintf("Error with DOI '%s': %s", doi, e$message))
+        list(doi = doi, uid = uid, abstract = NA_character_)
+      }
+    )
+  })
+  
+  # Flatten the list of per-record results into a single data frame
+  abstracts_df <- purrr::map_dfr(abstract_result, ~ tibble::tibble(
+    doi = .x$doi,
+    uid = .x$uid,
+    abstract = .x$abstract
+  )) %>%
+    filter(!is.na(abstract)) %>%
+    mutate(
+      abstract = stringr::str_squish(abstract)
+    ) %>%
+    left_join(new_unique_no_abstract, by = c("doi", "uid"))
+  
+  # Bind newly retrieved abstracts back onto the full citation set,
+  # replacing the old (missing-abstract) rows for any records now updated
+  if (nrow(abstracts_df) > 0) {
+    citations_updated <- citations %>%
+      filter(!uid %in% abstracts_df$uid) %>%
+      dplyr::bind_rows(abstracts_df)
+  } else {
+    citations_updated <- citations
+  }
+  
+  # Rename columns back to their original names for output
+  citations_updated <- citations_updated %>%
+    rename({{ abstract_col }} := abstract,
+           {{ doi_col }} := doi,
+           {{ id_col }} := uid)
+  
+  
+  # Report how many records are still missing an abstract after this run
+  still_no_abstract <- citations_updated %>%
+    filter(stringr::str_length(.data[[abstract_col]]) < 100 | is.na(.data[[abstract_col]]))
+  
+  message(nrow(still_no_abstract), " records still with no abstract")
+  
+  # Return dataset with added abstract text
+  invisible(citations_updated)
+}
