@@ -253,27 +253,28 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     # Rename and create columns for SOLES
     wos_results <- wos_results %>%
       mutate(
-        uid                = tolower(uid),
-        journal            = source$sourceTitle,
+        uid                = tolower(safe_col(wos_results, "uid")),
+        journal            = safe_col(wos_results, "source", "sourceTitle"),
         journal            = tools::toTitleCase(tolower(journal)),
-        year               = source$publishYear,
-        doi                = identifiers$doi,
+        year               = safe_col(wos_results, "source", "publishYear"),
+        doi                = safe_col(wos_results, "identifiers", "doi"),
         author             = sapply(names$authors, function(a) {
           paste(a$displayName, collapse = "; ")
         }),
-        pages              = NA_character_,
-        volume             = source$volume,
+        pages              = safe_col(wos_results, "source", "pages", "range"),
+        # pages              = NA_character_,
+        volume             = safe_col(wos_results, "source", "volume"),
         abstract           = NA_character_,
         isbn               = NA_character_,
         keywords           = sapply(keywords$authorKeywords, paste, collapse = "; "),
         secondarytitle     = NA_character_,
-        url                = links$record,
+        url                = safe_col(wos_results, "links", "record"),
         date               = format(Sys.Date(), "%d%m%y"),
-        issn               = identifiers$issn,
-        pmid               = identifiers$pmid,
+        issn               = safe_col(wos_results, "identifiers", "issn"),
+        pmid               = safe_col(wos_results, "identifiers", "pmid"),
         ptype              = tolower(sapply(types, paste, collapse = "; ")),
         author_country     = NA_character_,
-        number             = source$issue,
+        number             = safe_col(wos_results, "source", "issue"),
         author_affiliation = NA_character_,
         source             = "wos"
       ) %>%
@@ -290,8 +291,9 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     # Change all blanks to NA
     wos_results[wos_results == ""] <- NA_character_
     
-    # Make DOI lowercase
-    wos_results$doi <- tolower(wos_results$doi)
+    # Format DOI
+    wos_results <- format_doi(wos_results)
+    
     # Remove any additional DOIs (e.g., elife versioning)
     wos_results$doi <- gsub("; .+$", "", wos_results$doi)
     
@@ -746,4 +748,59 @@ get_page <- function(page,
   # simplifyVector = TRUE turns the nested JSON into data frames/vectors
   # where possible, which is what the downstream dplyr code expects
   httr2::resp_body_json(resp, simplifyVector = TRUE)
+}
+
+#' Safely extract a (possibly nested) column from a data frame
+#'
+#' @description
+#' Returns a vector for the requested column from \code{df}, defaulting to
+#' a vector of \code{NA} (of length \code{nrow(df)}) if the column, or a
+#' nested sub-field (up to two levels deep), does not exist. This guards
+#' against the WoS Starter API omitting fields for some records.
+#'
+#' @param df a data frame
+#' @param col character string, the top-level column name to extract
+#' @param subcol optional character string, a sub-field to extract from a
+#'   nested data frame column (e.g. \code{"source"} -> \code{"pages"})
+#' @param sub2col optional character string, a further nested sub-field
+#'   within \code{subcol} (e.g. \code{"source"} -> \code{"pages"} ->
+#'   \code{"range"}). Ignored if \code{subcol} is \code{NULL}.
+#' @param default value to fill with if the requested column/sub-field is
+#'   missing (default \code{NA_character_})
+#'
+#' @return a vector of length \code{nrow(df)}
+#' @export
+safe_col <- function(df, col, subcol = NULL, sub2col = NULL, default = NA_character_) {
+  n <- nrow(df)
+  
+  # Top-level column missing entirely - return all-default
+  if (!col %in% names(df)) {
+    return(rep(default, n))
+  }
+  
+  value <- df[[col]]
+  
+  # No sub-field requested - return the column as-is
+  if (is.null(subcol)) {
+    return(value)
+  }
+  
+  # Sub-field missing within the nested column - return all-default
+  if (!subcol %in% names(value)) {
+    return(rep(default, n))
+  }
+  
+  value <- value[[subcol]]
+  
+  # No second-level sub-field requested - return what we have so far
+  if (is.null(sub2col)) {
+    return(value)
+  }
+  
+  # Second-level sub-field missing - return all-default
+  if (!sub2col %in% names(value)) {
+    return(rep(default, n))
+  }
+  
+  value[[sub2col]]
 }
