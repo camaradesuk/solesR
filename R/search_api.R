@@ -215,7 +215,7 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
   }
   
   # Append timespan to user query to define final query
-  full_query <- paste0("(", query, ") AND DOP=(", min_date_char, "/", max_date_char, ")")
+  full_query <- paste0("(", query, ") AND LD=(", min_date_char, "/", max_date_char, ")")
   
   # Print message
   message("Running Web of Science Core Collection search...")
