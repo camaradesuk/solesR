@@ -183,6 +183,7 @@ get_missing_dois <- function(citations){
     # Remove non-specific titles
     filter(!title %in% c("Preface", "Foreword")) %>%
     # Remove short titles
+    
     filter(stringr::str_length(title) >= 25) %>%
     # Remove no DOI
     filter(is.na(doi)|doi=="") %>%
