@@ -22,6 +22,10 @@ format_doi <- function(df){
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("doi: ", "", x)))
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("doi:", "", x)))
   df["doi"] <- as.data.frame(sapply(df["doi"], function(x) gsub("doi", "", x)))
+  
+  # Set missing or literal "null" DOIs to a real NA
+  df <- df %>%
+    mutate(doi = ifelse(is.na(doi) | doi == "null", NA_character_, doi))
   return(df)
 }
 
