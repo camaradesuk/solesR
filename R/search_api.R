@@ -297,6 +297,9 @@ wos_search <- function(query = NULL, timespan = NULL, format_soles = TRUE) {
     # Remove any additional DOIs (e.g., elife versioning)
     wos_results$doi <- gsub("; .+$", "", wos_results$doi)
     
+    # Format the UID for SOLES
+    wos_results$uid <- gsub("^wos:", "wos-", wos_results$uid)
+    
     # Print message
     message("Formatted!")
   }
