@@ -264,7 +264,7 @@ syrf_decisions_to_db <- function(con,
 
     training_data <- read.csv(file) %>%
       janitor::clean_names() %>%
-      select(uid = custom_id, date = date_time_of_screening, decision = screening_status) %>%
+      select(uid = custom_id, date = date_time_of_screenings, decision = screening_status) %>%
       mutate(uid = tolower(uid),
              decision = tolower(decision),
              date = substr(date, 1, 10),
