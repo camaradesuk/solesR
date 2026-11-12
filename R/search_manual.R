@@ -508,7 +508,7 @@ process_wos <- function(path) {
     newdat$source <- "wos"
     
     # Format the UID for SOLES
-    newdat$uid <- gsub("^wos:", "wos-", newdat$uid, ignore.case = TRUE)
+    newdat$uid <- sub("^wos:?", "wos-", newdat$uid, ignore.case = TRUE)
     
     # Format author country
     newdat$author_country <- stringr::str_extract(newdat$author_country, "\\b(\\w+)\\b$")
