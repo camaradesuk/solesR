@@ -668,8 +668,7 @@ convert_xmls_to_txt <- function(folder) {
     
     # Skip metadata-only records; warn on abstract-only ones
     if (is.na(body) && is.na(abstract)) stop("no abstract or body text (metadata only)")
-    if (is.na(body)) message("No body text, abstract only: ", basename(file))
-    
+    if (is.na(body)) stop("no body text (abstract only)")    
     paste(c(
       if (!is.na(title))    paste("#", stringr::str_remove(clean(xml2::xml_text(title)), "\\*+$")),
       if (!is.na(abstract)) c("## Abstract", sec_to_text(abstract, 2)),
