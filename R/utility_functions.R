@@ -566,3 +566,228 @@ format_tiab <- function(df) {
   
   return(df)
 }
+
+#' Convert XML full texts to text files
+#'
+#' Converts each XML (JATS/PMC or Elsevier) in `folder` that has no matching
+#' `.txt` into a text file of its title, abstract and body, saved next to the
+#' XML. Figures, tables, references and back matter are dropped. XMLs that
+#' fail (not XML, metadata only, or unreadable) are **deleted**.
+#'
+#' @param folder Folder containing the XML files, e.g. `"full_texts"`.
+#' @return Invisibly, the paths of the text files created.
+#' @seealso [add_txt_files()] to add the new text files to the `full_texts` table.
+#' @importFrom xml2 read_xml xml_children xml_name xml_text xml_find_all
+#'   xml_find_first xml_remove
+#' @importFrom purrr map2_lgl
+#' @importFrom stringr str_squish str_trim str_detect str_remove
+#' @export
+convert_xmls_to_txt <- function(folder) {
+  
+  # Find XMLs with no .txt alongside them
+  xmls <- list.files(folder, pattern = "\\.xml$", full.names = TRUE, ignore.case = TRUE)
+  txts <- sub("\\.xml$", ".txt", xmls, ignore.case = TRUE)
+  todo <- !file.exists(txts)
+  
+  message(sum(todo), " of ", length(xmls), " XML files have no matching txt file")
+  if (!any(todo)) return(invisible(character()))
+  
+  clean <- function(x) stringr::str_squish(paste(x, collapse = " "))
+  
+  # Recursively turn a section into "## heading\n\nparagraphs"
+  sec_to_text <- function(sec, level = 2) {
+    out <- character()
+    for (child in xml2::xml_children(sec)) {
+      nm <- xml2::xml_name(child)
+      if (nm %in% c("title", "section-title")) {
+        out <- c(out, paste(strrep("#", level), clean(xml2::xml_text(child))))
+      } else if (nm %in% c("sec", "section", "abstract-sec")) {
+        out <- c(out, sec_to_text(child, level + 1))
+      } else if (!nm %in% c("label", "sec-meta")) {
+        txt <- clean(xml2::xml_text(child))
+        if (nchar(txt) > 0) out <- c(out, txt)
+      }
+    }
+    out
+  }
+  
+  # Parse one XML file to text
+  parse_one <- function(file) {
+    raw <- paste(readLines(file, encoding = "UTF-8", warn = FALSE), collapse = "\n")
+    
+    # Catch web pages and PDFs saved with an .xml extension
+    start <- tolower(substr(stringr::str_trim(raw), 1, 200))
+    if (stringr::str_detect(start, "^%pdf"))                stop("not XML (PDF file)")
+    if (stringr::str_detect(start, "<!doctype html|<html")) stop("not XML (HTML page)")
+    
+    # Remove namespaces so Elsevier tags like <ce:section> become <section>
+    raw <- gsub('\\s+xmlns(:[A-Za-z]+)?="[^"]*"', "", raw)
+    raw <- gsub("<(/?)[A-Za-z]+:", "<\\1", raw)              # element prefixes
+    raw <- gsub('\\s[A-Za-z]+:[A-Za-z-]+="[^"]*"', "", raw)  # prefixed attributes
+    
+    # Add a space after block-level tags so neighbouring text doesn't run
+    # together, e.g. "<label>(1)</label><p>NO release" -> "(1) NO release"
+    blocks <- "p|para|simple-para|list-item|label|term|def|title|section-title|td|th|entry|caption"
+    raw <- gsub(paste0("</(", blocks, ")>"), " </\\1>", raw)
+    
+    doc <- xml2::read_xml(raw, options = c("RECOVER", "NONET", "HUGE"))
+    
+    # Strip things that aren't prose
+    junk <- c("fig", "table-wrap", "table", "disp-formula", "supplementary-material",
+              "float-anchor", "figure", "display", "inline-figure", "graphic",
+              "alternatives", "object", "math", "ref-list", "bibliography",
+              "fn", "footnote", "glossary", "outline")
+    xml2::xml_remove(xml2::xml_find_all(doc, paste0("//", junk, collapse = " | ")))
+    
+    # Drop back-matter-style sections that some publishers put inside the body
+    skip <- paste0(
+      "^(\\d+(\\.\\d+)*\\.?\\s*)?(list of )?(references|associated data|supplement(al|ary)|",
+      "additional files|footnotes|acknowledg|disclosure|declaration|conflicts? of interest|",
+      "competing interest|funding|(description of )?author.{0,15}(contribution|role)|",
+      "credit authorship|(data|materials?|code|software|resources?).{0,15}availability|",
+      "availability of|consent for publication|lead contact|materials? and correspondence|",
+      "human and animal rights|abbreviations|ethic|peer review|publisher.s note|",
+      "generative ai|presentation at|.*statement$)"
+    )
+    for (s in xml2::xml_find_all(doc, "//sec | //section")) {
+      ttl <- xml2::xml_text(xml2::xml_find_first(s, "./title | ./section-title"))
+      if (!is.na(ttl) && stringr::str_detect(tolower(stringr::str_squish(ttl)), skip)) xml2::xml_remove(s)
+    }
+    
+    # Locate title, abstract and body for each format
+    if (xml2::xml_name(doc) == "full-text-retrieval-response") {   # Elsevier
+      title    <- xml2::xml_find_first(doc, "//coredata/title")
+      abstract <- xml2::xml_find_first(doc, "//originalText//abstract[@class='author']")
+      body     <- xml2::xml_find_first(doc, "//originalText//sections")
+    } else {                                                        # JATS
+      title    <- xml2::xml_find_first(doc, "//article-meta/title-group/article-title")
+      abstract <- xml2::xml_find_first(doc, "//article-meta/abstract[not(@abstract-type)]")
+      body     <- xml2::xml_find_first(doc, "//body")
+    }
+    if (!is.na(abstract)) xml2::xml_remove(xml2::xml_find_all(abstract, "./title | ./section-title"))
+    
+    # Skip metadata-only records; warn on abstract-only ones
+    if (is.na(body) && is.na(abstract)) stop("no abstract or body text (metadata only)")
+    if (is.na(body)) message("No body text, abstract only: ", basename(file))
+    
+    paste(c(
+      if (!is.na(title))    paste("#", stringr::str_remove(clean(xml2::xml_text(title)), "\\*+$")),
+      if (!is.na(abstract)) c("## Abstract", sec_to_text(abstract, 2)),
+      if (!is.na(body))     sec_to_text(body, 2)
+    ), collapse = "\n\n")
+  }
+  
+  # Convert each one; delete any XML that fails, without stopping
+  ok <- purrr::map2_lgl(xmls[todo], txts[todo], function(xml, txt) {
+    tryCatch({
+      writeLines(enc2utf8(parse_one(xml)), txt, useBytes = TRUE)
+      TRUE
+    }, error = function(e) {
+      message("Failed and deleted: ", basename(xml), " - ", conditionMessage(e))
+      file.remove(xml)
+      FALSE
+    })
+  })
+  
+  message("Converted ", sum(ok), " file(s)", if (any(!ok)) paste0(", ", sum(!ok), " failed and deleted"))
+  invisible(txts[todo][ok])
+}
+
+
+#' Add new text files to full_texts
+#'
+#' Adds new `.txt` files to the `full_texts` table when their matching PDF or
+#' XML (same name and folder) is in the table with status "found". Each is
+#' added with the source's DOI and `method = "pdftotext"` or `"xml_to_text"`;
+#' if both a PDF and an XML match, the PDF is used. Run within `pico_tag()`
+#' after full text tagging, or on its own.
+#'
+#' @param con A database connection.
+#' @return Invisibly, the number of text files added.
+#' @seealso [convert_xmls_to_txt()] to create text files from XMLs.
+#' @import DBI
+#' @import dplyr
+#' @export
+add_txt_files <- function(con){
+  
+  # Check full_texts table exists
+  if (!DBI::dbExistsTable(con, "full_texts")) {
+    stop("No full_texts database table exists.")
+  }
+  
+  # Read full_texts table
+  ft_tbl <- DBI::dbReadTable(con, "full_texts")
+  
+  # Get found PDFs and XMLs, with the method that turns each into text
+  ft_src <- ft_tbl %>%
+    dplyr::filter(status == "found") %>%
+    dplyr::filter(!is.na(path)) %>%
+    dplyr::filter(grepl("\\.(pdf|xml)$", path, ignore.case = TRUE)) %>%
+    dplyr::mutate(
+      src_ext = tolower(tools::file_ext(path)),
+      method  = ifelse(src_ext == "pdf", "pdftotext", "xml_to_text"),
+      stem    = sub("\\.(pdf|xml)$", "", path, ignore.case = TRUE)
+    ) %>%
+    dplyr::select(doi, doi_encoded, stem, src_ext, method)
+  
+  # If no PDFs or XMLs, exit
+  if (nrow(ft_src) < 1) {
+    message("No PDFs or XMLs in full_texts table")
+    return(invisible(0))
+  }
+  
+  # Get folders used in full_texts table
+  ft_folders <- unique(dirname(ft_src$stem))
+  
+  # Get all text files in those folders
+  txt_files <- list.files(
+    ft_folders,
+    pattern = "\\.txt$",
+    full.names = TRUE,
+    ignore.case = TRUE
+  )
+  
+  # Remove text files already in the full_texts table
+  txt_files <- txt_files[!txt_files %in% ft_tbl$path]
+  
+  # If no new text files, exit
+  if (length(txt_files) < 1) {
+    message("No new text files found")
+    return(invisible(0))
+  }
+  
+  # Link text files to their PDF or XML in the full_texts table
+  txt_new <- data.frame(
+    path = txt_files,
+    stem = sub("\\.txt$", "", txt_files, ignore.case = TRUE),
+    stringsAsFactors = FALSE
+  ) %>%
+    dplyr::inner_join(ft_src, by = "stem", relationship = "many-to-many") %>%
+    # One row per text file; prefer the PDF if both a PDF and XML match
+    dplyr::arrange(path, src_ext != "pdf") %>%
+    dplyr::distinct(path, .keep_all = TRUE) %>%
+    dplyr::mutate(
+      status = "found",
+      ft_ext = "txt",
+      date = Sys.Date()
+    ) %>%
+    dplyr::select(status, doi_encoded, doi, method, path, ft_ext, date)
+  
+  # If no text files match a PDF or XML, exit
+  if (nrow(txt_new) < 1) {
+    message("No new text files linked to PDFs or XMLs in full_texts table")
+    return(invisible(0))
+  }
+  
+  # Add new text files to full_texts table
+  DBI::dbWriteTable(con, "full_texts", txt_new, append = TRUE)
+  
+  message(paste0(
+    nrow(txt_new), " new text files added to full_texts table (",
+    sum(txt_new$method == "pdftotext"), " from PDFs, ",
+    sum(txt_new$method == "xml_to_text"), " from XMLs)"
+  ))
+  
+  # Return number of text files added
+  return(invisible(nrow(txt_new)))
+}

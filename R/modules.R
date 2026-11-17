@@ -1,3 +1,32 @@
+# modules.R
+# Shiny modules for the SOLES apps, copied out of the solesR package so the app no longer
+# has to load solesR (and all of its workflow dependencies) at startup.
+#
+# Performance changes compared with the solesR versions:
+#   - search_Server: removed the artificial 5-second Sys.sleep progress loop; the search text
+#     and de-duplicated PICO table are built once instead of on every search
+#   - pico_multi_select_UI/Server (single-select): the dropdown choices are sent server-side,
+#     so the full list of names is no longer written into every page load
+#   - pico_multi_select_Server, pico_dropdown_Server: filter with plain indexing instead of
+#     converting whole columns to factors on every change
+#   - download_table_Server: takes a reactive table, so downloads are per-user (the previous
+#     version read a global variable shared by every user on the same R process)
+#   - removed the unused shinyFeedback call
+#   - sunburstSever calls solesR::format_as_sunburst(), so solesR is only loaded if a
+#     sunburst is actually drawn (solesR and viridis must stay installed if you use it)
+#   - location_map_UI/Server: the institution / intervention / outcome / model dropdowns start
+#     empty (meaning "all") and their choices are sent server-side, instead of every name being
+#     written into the page, pre-selected, for every visitor; filtering intersects the paper ids
+#     from each PICO table instead of using data_for_bubble (the 1.8 million row intervention x
+#     outcome x model table); the base map is drawn once and filter changes only redraw the
+#     markers (one per institution); the table is a per-user reactive passed to
+#     download_table_Server
+#
+# Behaviour fixes:
+#   - location_map_Server: selecting a country no longer drops the intervention / outcome / model
+#     filters, and when nothing matches the filters a message is shown instead of silently
+#     showing everything
+
 #' Generate a Yearly Bar Chart
 #'
 #' This Shiny module creates a bar chart displaying the count of occurrences by year for a selected column in a given table. The chart includes a legend with a color-coded representation of the column values. This module is designed to be used within a Shiny application.
@@ -431,7 +460,9 @@ sunburstSever <- function(id, data) {
         sb_data <- data %>%
           filter(!grepl("^Unknown", name))
         
-        df <- format_as_sunburst(sb_data, main_category, sub_category1, name)
+        # format_as_sunburst() lives in solesR. Calling it with :: loads solesR only when a
+        # sunburst is actually drawn, so apps that don't use this module don't pay for it.
+        df <- solesR::format_as_sunburst(sb_data, main_category, sub_category1, name)
         
         plot_ly(df,
                 ids = ~ids,
@@ -455,6 +486,8 @@ sunburstSever <- function(id, data) {
       })
     })
 }
+
+
 
 
 #' PICO Multi-Select UI
@@ -487,7 +520,6 @@ pico_multi_select_UI <- function(id,
                                  spinner_colour) {
   
   ns <- NS(id)
-  shinyFeedback::useShinyFeedback()
   
   if (multi_select){
     
@@ -558,20 +590,17 @@ pico_multi_select_UI <- function(id,
                     color: black !important;
                     }')),
       
-      pickerInput(
+      # Only the default selections are written into the page; the full list of choices is
+      # sent server-side by pico_multi_select_Server, so the browser fetches matches as the
+      # user types instead of every page load carrying every name.
+      selectizeInput(
         inputId = ns("select_cat_picker"),
         label = label1,
-        choices = sort(unique(column)),
+        choices = selected,
         selected = selected,
         multiple = TRUE,
-        options = pickerOptions(noneSelectedText = "Please Select",
-                                virtualScroll = 100,
-                                actionsBox = TRUE,
-                                size = 10,
-                                liveSearch = TRUE,
-                                maxOptions = 20
-                                
-        )
+        options = list(maxItems = 20,
+                       placeholder = "Type to search")
       ),
       
       plotlyOutput(ns("single_select_plot")) %>% withSpinner(color = spinner_colour),
@@ -606,6 +635,7 @@ pico_multi_select_UI <- function(id,
 #' @param column The name of the first column for generating the chart.
 #' @param column2 The name of the second column (if multi-select is TRUE and 2 dropdown menus are required).
 #' @param text The text to display below the chart stating the origin of the data.
+#' @param selected (single-select only) The default selection; must match `selected` in the UI.
 #'
 #' @export
 pico_multi_select_Server  <- function(id,
@@ -613,21 +643,34 @@ pico_multi_select_Server  <- function(id,
                                       table,
                                       column,
                                       column2,
-                                      text){
+                                      text,
+                                      selected = NULL){
   moduleServer(
     id,
     function(input, output, session) {
+      
+      # Update the year slider to the range of the selected items, keeping the default
+      # start year of 1980 inside that range
+      update_year_slider <- function(selected_years) {
+        selected_years <- selected_years[!is.na(selected_years)]
+        req(length(selected_years) > 0)
+        updateSliderInput(session, "pico_year_slider",
+                          min = min(selected_years),
+                          max = max(selected_years),
+                          value = c(max(1980, min(selected_years)),
+                                    max(selected_years)),
+                          step = 1)
+      }
       
       if (multi_select){
         
         interventions_in_cat <- reactive({
           
-          data <- table %>%
-            mutate(column = as.factor(!!rlang::sym(column))) %>% 
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>%
-            filter(column %in% input$select_cat_picker) %>% 
-            filter(column2 %in% input$select_type_picker)
-          return(data)
+          keep <- table[[column]] %in% input$select_cat_picker &
+            table[[column2]] %in% input$select_type_picker
+          data <- table[keep, c("uid", "year", column, column2)]
+          names(data) <- c("uid", "year", "column", "column2")
+          return(distinct(data))
           
         })
         
@@ -683,16 +726,7 @@ pico_multi_select_Server  <- function(id,
         
         dynamic_updated_target_selection <- reactive({
           
-          table_list <- table %>%
-            mutate(column = as.factor(!!rlang::sym(column))) %>% 
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>%
-            filter(column %in% input$select_cat_picker)
-          
-          table_list <- unique(table_list$column2)
-          table_list <- as.vector(table_list)
-          table_list <- sort(table_list)
-          
-          return(table_list)
+          sort(unique(as.character(table[[column2]][table[[column]] %in% input$select_cat_picker])))
           
         })
         
@@ -708,29 +742,24 @@ pico_multi_select_Server  <- function(id,
         
         observeEvent(input$select_type_picker, {
           
-          selected_years <- table %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            filter(column2 %in% input$select_type_picker) %>%
-            pull(year)
+          update_year_slider(table$year[table[[column2]] %in% input$select_type_picker])
           
-          updateSliderInput(session, "pico_year_slider",
-                            min = min(selected_years),
-                            max = max(selected_years),
-                            value = c(1980,
-                                      max(selected_years)),
-                            step = 1)
         })
         
       } else {
         
+        # Send the full list of choices server-side (see pico_multi_select_UI)
+        updateSelectizeInput(session, "select_cat_picker",
+                             choices = sort(unique(as.character(table[[column]]))),
+                             selected = selected,
+                             server = TRUE)
         
+        # One row per paper, year and selected item, so each paper is counted once
         interventions_in_cat <- reactive({
           
-          data <- table %>%
-            mutate(column = as.factor(!!rlang::sym(column))) %>% 
-            filter(column %in% input$select_cat_picker) 
-          
-          return(data)
+          data <- table[table[[column]] %in% input$select_cat_picker, c("uid", "year", column)]
+          names(data) <- c("uid", "year", "column")
+          return(distinct(data))
           
         })
         
@@ -785,17 +814,8 @@ pico_multi_select_Server  <- function(id,
         
         observeEvent(input$select_cat_picker, {
           
-          selected_years <- table %>%
-            mutate(column = as.factor(!!rlang::sym(column))) %>% 
-            filter(column %in% input$select_cat_picker) %>%
-            pull(year)
+          update_year_slider(table$year[table[[column]] %in% input$select_cat_picker])
           
-          updateSliderInput(session, "pico_year_slider",
-                            min = min(selected_years),
-                            max = max(selected_years),
-                            value = c(1980,
-                                      max(selected_years)),
-                            step = 1)
         })
         
       }
@@ -1100,6 +1120,17 @@ search_Server <- function(id,
       
       ns <- NS(id)
       
+      # De-duplicate the PICO table once, not on every search
+      combined_pico_table <- unique(combined_pico_table)
+      
+      # Text that searches run against: built on the first search, then reused
+      search_text_cache <- NULL
+      search_text <- function() {
+        if (is.null(search_text_cache)) {
+          search_text_cache <<- paste(table$title, table$abstract, table$keywords)
+        }
+        search_text_cache
+      }
       
       # Creates list for dropdown menus
       dynamic_dropdowns <- list()
@@ -1372,19 +1403,12 @@ search_Server <- function(id,
               
             } else{
               
-              selected_studies <- selected_studies[with(selected_studies,
-                                                        grepl(search_query(),
-                                                              paste(title, abstract, keywords),
-                                                              ignore.case=TRUE,
-                                                              perl=TRUE)),]
-              
-              withProgress(message = 'Performing search',
-                           detail = 'This may take a little while...', value = 0, {
-                             for (i in 1:25) {
-                               incProgress(1/15)
-                               Sys.sleep(0.2)
-                             }
-                           })
+              withProgress(message = 'Performing search', value = 0.5, {
+                selected_studies <- selected_studies[grepl(search_query(),
+                                                           search_text(),
+                                                           ignore.case=TRUE,
+                                                           perl=TRUE),]
+              })
             }
           } else if (is.na(search_query()[1]) | is.na(search_query()[2])){
             
@@ -1395,16 +1419,16 @@ search_Server <- function(id,
             
           } else{
             
-            selected_studies1 <- table[with(table,
-                                            grepl(search_query()[1],
-                                                  paste(title, abstract, keywords),
-                                                  ignore.case=TRUE,
-                                                  perl=TRUE)),]
-            selected_studies2 <- table[with(table,
-                                            grepl(search_query()[2],
-                                                  paste(title, abstract, keywords),
-                                                  ignore.case=TRUE,
-                                                  perl=TRUE)),]
+            withProgress(message = 'Performing search', value = 0.5, {
+              selected_studies1 <- table[grepl(search_query()[1],
+                                               search_text(),
+                                               ignore.case=TRUE,
+                                               perl=TRUE),]
+              selected_studies2 <- table[grepl(search_query()[2],
+                                               search_text(),
+                                               ignore.case=TRUE,
+                                               perl=TRUE),]
+            })
             
             
             if(input$comb_1_2 == "AND"){
@@ -1419,14 +1443,6 @@ search_Server <- function(id,
                 filter(uid %in% c(selected_studies1$uid, selected_studies2$uid)) %>%
                 distinct()
             }
-            
-            withProgress(message = 'Performing search',
-                         detail = 'This may take a little while...', value = 0, {
-                           for (i in 1:25) {
-                             incProgress(1/15)
-                             Sys.sleep(0.2)
-                           }
-                         })
             
           }}
         return(selected_studies)
@@ -1447,7 +1463,6 @@ search_Server <- function(id,
             mutate(link = ifelse(!is.na(doi), paste0("https://doi.org/", doi), url)) %>%
             arrange(desc(year))
           
-          combined_pico_table <- unique(combined_pico_table)
           selected_studies <- selected_studies %>%
             mutate(title = ifelse(!is.na(doi) & doi != "", 
                                   paste0("<a href='", link, "' target='_blank'>", title, "</a>"), 
@@ -1511,7 +1526,6 @@ search_Server <- function(id,
           mutate(link = ifelse(!is.na(doi), paste0("https://doi.org/", doi), url)) %>%
           arrange(desc(year))
         
-        combined_pico_table <- unique(combined_pico_table)
         selected_studies <- selected_studies %>%
           mutate(title = ifelse(!is.na(doi) & doi != "", 
                                 paste0("<a href='", link, "' target='_blank'>", title, "</a>"), 
@@ -1969,33 +1983,24 @@ pico_dropdown_Server <- function(id, table,
     function(input, output, session) {
       ns <- NS(id)
       
+      # Sorted unique values of `col` in the rows where `keep` is TRUE.
+      # (Plain indexing; the previous version converted whole columns to factors each time.)
+      values_where <- function(col, keep) sort(unique(as.character(table[[col]][keep])))
+      
+      in_filter <- function(col, selected) table[[col]] %in% selected
+      
       if (filter_no == 1){
-        dynamic_dropdown_search <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            filter(column1 %in% input$dropdown_filter1) %>%
-            distinct(name) %>%
-            pull() %>%
-            sort()
-        })
         
+        dynamic_dropdown_search <- reactive({
+          values_where("name", in_filter(column1, input$dropdown_filter1))
+        })
         
       }
       
       else if (filter_no == 2){
         
         dynamic_dropdown_search2 <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            filter(column2 %in% input$dropdown_filter2) %>%
-            distinct(column1) %>% 
-            mutate(column1 = as.character(column1)) %>% 
-            pull() %>% 
-            sort()
-          
+          values_where(column1, in_filter(column2, input$dropdown_filter2))
         })
         
         observe({
@@ -2005,54 +2010,28 @@ pico_dropdown_Server <- function(id, table,
         })
         
         dynamic_dropdown_search <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            filter(column1 %in% input$dropdown_filter1) %>%
-            distinct(name) %>% 
-            pull() %>% 
-            sort()
+          values_where("name", in_filter(column1, input$dropdown_filter1))
         })
-        
         
       }
       
       else if (filter_no == 3){
         
         dynamic_dropdown_search3 <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            mutate(column3 = as.factor(!!rlang::sym(column3))) %>% 
-            filter(column3 %in% input$dropdown_filter3) %>% 
-            distinct(column2) %>% 
-            mutate(column2 = as.character(column2)) %>% 
-            pull() %>% 
-            sort()
-          
+          values_where(column2, in_filter(column3, input$dropdown_filter3))
         })
+        
         observe({
           updatePickerInput(session = session, ("dropdown_filter2"),
                             choices = dynamic_dropdown_search3(),
                             selected = dynamic_dropdown_search3())
         })
         
-        
         dynamic_dropdown_search2 <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            mutate(column3 = as.factor(!!rlang::sym(column3))) %>% 
-            filter(column3 %in% input$dropdown_filter3) %>% 
-            filter(column2 %in% input$dropdown_filter2) %>%
-            distinct(column1) %>%
-            mutate(column1 = as.character(column1)) %>%
-            pull() %>% 
-            sort()
-          
+          values_where(column1, in_filter(column3, input$dropdown_filter3) &
+                         in_filter(column2, input$dropdown_filter2))
         })
+        
         observe({
           updatePickerInput(session = session, ("dropdown_filter1"),
                             choices = dynamic_dropdown_search2(),
@@ -2060,32 +2039,15 @@ pico_dropdown_Server <- function(id, table,
         })
         
         dynamic_dropdown_search <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            filter(column1 %in% input$dropdown_filter1) %>%
-            distinct(name) %>% 
-            pull() %>% 
-            sort()
+          values_where("name", in_filter(column1, input$dropdown_filter1))
         })
         
-      }      
+      }
       
       else if (filter_no == 4){
         
         dynamic_dropdown_search3 <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            mutate(column3 = as.factor(!!rlang::sym(column3))) %>% 
-            mutate(column4 = as.factor(!!rlang::sym(column4))) %>%
-            filter(column4 %in% input$dropdown_filter4) %>% 
-            distinct(column3) %>% 
-            mutate(column3 = as.character(column3)) %>% 
-            pull() %>% 
-            sort()
-          
+          values_where(column3, in_filter(column4, input$dropdown_filter4))
         })
         
         observe({
@@ -2095,19 +2057,8 @@ pico_dropdown_Server <- function(id, table,
         })
         
         dynamic_dropdown_search2 <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            mutate(column3 = as.factor(!!rlang::sym(column3))) %>% 
-            mutate(column4 = as.factor(!!rlang::sym(column4))) %>%
-            filter(column4 %in% input$dropdown_filter4) %>% 
-            filter(column3 %in% input$dropdown_filter3) %>% 
-            distinct(column2) %>% 
-            mutate(column2 = as.character(column2)) %>% 
-            pull() %>% 
-            sort()
-          
+          values_where(column2, in_filter(column4, input$dropdown_filter4) &
+                         in_filter(column3, input$dropdown_filter3))
         })
         
         observe({
@@ -2117,28 +2068,16 @@ pico_dropdown_Server <- function(id, table,
         })
         
         dynamic_dropdown_search <- reactive({
-          
-          pico_list <- table %>%
-            mutate(column1 = as.factor(!!rlang::sym(column1))) %>%
-            mutate(column2 = as.factor(!!rlang::sym(column2))) %>% 
-            mutate(column3 = as.factor(!!rlang::sym(column3))) %>% 
-            mutate(column4 = as.factor(!!rlang::sym(column4))) %>%
-            filter(column4 %in% input$dropdown_filter4) %>% 
-            filter(column3 %in% input$dropdown_filter3) %>%
-            filter(column2 %in% input$dropdown_filter2) %>% 
-            distinct(column1) %>% 
-            mutate(column1 = as.character(column1)) %>% 
-            pull() %>% 
-            sort()
-          
+          values_where(column1, in_filter(column4, input$dropdown_filter4) &
+                         in_filter(column3, input$dropdown_filter3) &
+                         in_filter(column2, input$dropdown_filter2))
         })
         
         observe({
           updatePickerInput(session = session, ("dropdown_filter1"),
-                            choices = dynamic_dropdown_search2(),
-                            selected = dynamic_dropdown_search2())
+                            choices = dynamic_dropdown_search(),
+                            selected = dynamic_dropdown_search())
         })
-        
         
       }
       
@@ -2208,7 +2147,8 @@ download_table_UI <- function(id) {
 #' This Shiny module server handles the server-side logic for downloading citation metadata
 #'
 #' @param id The module identifier.
-#' @param table The filtered table which the user wishes to download
+#' @param table A reactive returning the filtered table the user wishes to download
+#'   (it must have a `uid` column). A plain data frame is also accepted.
 #' @param citations_for_dl All of the included studies and metadata
 #'
 #' @export
@@ -2217,7 +2157,17 @@ download_table_Server <- function(id, table, citations_for_dl) {
     id,
     function(input, output, session) {
       
-      ns <- NS(id)  
+      ns <- NS(id)
+      
+      # uids of the rows currently shown to this user
+      selected_uids <- function() {
+        
+        if (is.reactive(table)) 
+          table()$uid 
+        else 
+          table$uid
+      }
+      
       # Download citations sever side --------
       # download refs button server side -csv
       output$download_csv <- downloadHandler(
@@ -2234,7 +2184,7 @@ download_table_Server <- function(id, table, citations_for_dl) {
       search_results_download <- reactive({
         
         results <- citations_for_dl %>%
-          filter(uid %in% !!table$uid) %>% 
+          filter(uid %in% selected_uids()) %>% 
           mutate(abstract = "")
         
         
@@ -2243,7 +2193,7 @@ download_table_Server <- function(id, table, citations_for_dl) {
       search_results_download_syrf <- reactive({
         
         results <- citations_for_dl %>%
-          filter(uid %in% !!table$uid)
+          filter(uid %in% selected_uids())
         
         results <- results %>%
           rename(Authors = author,
@@ -2291,10 +2241,10 @@ download_table_Server <- function(id, table, citations_for_dl) {
       search_results_download_endnote <- reactive({
         
         results <- citations_for_dl %>%
-          filter(uid %in% !!table$uid)
+          filter(uid %in% selected_uids())
         
         results <- results %>%
-          filter(uid %in% table$uid) %>%
+          filter(uid %in% selected_uids()) %>%
           mutate("Reference Type" = "Journal Article") %>%
           mutate(isbn = gsub("\\r\\n|\\r|\\n", "", isbn)) %>%
           rename("Custom 1" = uid,
@@ -2919,7 +2869,7 @@ evidence_map_Server <- function(id,
       observeEvent(input$legend_specific_select, {
         
         # Compare current selection with the previous one
-        if (!identical(input$legened_specific_select, legend_specific())) {
+        if (!identical(input$legend_specific_select, legend_specific())) {
           
           # Enable render plot button and reset click bubble info
           shinyjs::enable("render_evidence_map")
@@ -3475,8 +3425,6 @@ evidence_map_Server <- function(id,
       # Evidence map - datatable -----
       output$evidence_map_datatable <- DT::renderDataTable({
         
-        dl_evidence_map  <<- table_react()
-        
         tryCatch({
           
           # Render the datatable
@@ -3530,7 +3478,378 @@ evidence_map_Server <- function(id,
       })
       
       download_table_Server("dl_evidence_map",
-                            table = dl_evidence_map, citations_for_dl = included_with_metadata)
+                            table = table_react, citations_for_dl = citations_metadata)
+    }
+  )
+}
+
+
+# Choices for the large dropdowns, computed once per R process and shared by all sessions
+.location_choice_cache <- new.env()
+location_choices <- function(key, values) {
+  if (is.null(.location_choice_cache[[key]])) {
+    assign(key, sort(unique(as.character(values))), envir = .location_choice_cache)
+  }
+  .location_choice_cache[[key]]
+}
+
+# uids of papers tagged with any of `selected` names; NULL means "no filter"
+location_uids_for <- function(df, selected) {
+  if (length(selected) == 0) return(NULL)
+  unique(df$uid[df$name %in% selected])
+}
+
+
+#' Location Map UI Module
+#'
+#' Interactive map of research institutions, with filters for country, continent,
+#' institution type, institution, intervention, outcome and model, and a table of the
+#' studies behind the selected institutions.
+#'
+#' Uses these global data frames loaded in app.R:
+#'   institution_tag, interventions_df, outcome_df, model_df, pico, included_with_metadata
+#'
+#' @param id A string representing the namespace ID for the module.
+#'
+#' @export
+location_map_UI <- function(id) {
+  ns <- NS(id)
+  
+  # A searchable multi-select whose choices are filled in by the server
+  server_select <- function(input_id, label, placeholder) {
+    selectizeInput(inputId = ns(input_id),
+                   label = label,
+                   choices = NULL,
+                   multiple = TRUE,
+                   options = list(placeholder = placeholder))
+  }
+  
+  tagList(
+    fluidRow(
+      valueBox(
+        width = 4,
+        subtitle = span("Institutions producing research", style = "color: white;"),
+        color = "info",
+        value = span(length(unique(institution_tag$name)) - 1,
+                     style = "font-size: 300%; color: white;"),
+        icon = icon("landmark")
+      ),
+      
+      valueBox(
+        width = 4,
+        subtitle = span("Countries producing research", style = "color: white;"),
+        color = "primary",
+        value = span(length(unique(institution_tag$country)) - 1,
+                     style = "font-size: 300%; color: white;"),
+        icon = icon("earth-europe", verify_fa = FALSE)
+      ),
+      valueBox(
+        width = 4,
+        subtitle = span("Publications tagged with institution", style = "color: white;"),
+        color = "danger",
+        value = span(round(length(institution_tag$name[which(institution_tag$name != "Unknown")]) /
+                             nrow(included_with_metadata) * 100, 1), "%",
+                     style = "font-size: 300%; color: white;"),
+        icon = icon("bar-chart", verify_fa = FALSE)
+      )
+    ),
+    fluidRow(
+      box(
+        width = 12,
+        title = "Research institutions world map",
+        status = "primary",
+        solidHeader = TRUE,
+        collapsable = FALSE,
+        closable = FALSE,
+        
+        sidebar = c(
+          
+          boxSidebar(
+            width = 40,
+            background = "#344149",
+            id = ns("inst_loc_sidebar"),
+            icon = icon("angles-right"),
+            fluidRow(
+              column(width = 11,
+                     tags$div(
+                       style = "padding: 0px;",
+                       selectizeInput(inputId = ns("country_select"),
+                                      label = "Select a Country",
+                                      choices = sort(unique(institution_tag$country)),
+                                      selected = NULL,
+                                      multiple = TRUE,
+                                      options = list(
+                                        placeholder = "All countries"
+                                      )
+                       ),
+                       pickerInput(
+                         inputId = ns("continent_select"),
+                         label = "Select a Continent",
+                         choices = sort(unique(institution_tag$continent)),
+                         selected = sort(unique(institution_tag$continent)),
+                         multiple = TRUE,
+                         options = pickerOptions(
+                           noneSelectedText = "All continents",
+                           virtualScroll = 100,
+                           actionsBox = TRUE,
+                           size = 10
+                         )
+                       ),
+                       pickerInput(
+                         inputId = ns("inst_type_select"),
+                         label = "Select Institution Type",
+                         choices = sort(unique(institution_tag$type)),
+                         selected = sort(unique(institution_tag$type)),
+                         multiple = TRUE,
+                         options = pickerOptions(
+                           noneSelectedText = "All types",
+                           virtualScroll = 100,
+                           actionsBox = TRUE,
+                           size = 10
+                         )
+                       ),
+                       server_select("institution_select", "Select Institution(s)", "All institutions"),
+                       server_select("intervention_loc_select", "Select Intervention(s)", "All interventions"),
+                       server_select("outcome_loc_select", "Select Outcome(s)", "All outcomes"),
+                       server_select("model_loc_select", "Select Model(s)", "All models")
+                     )
+              )
+            )
+          )
+        ),
+        fluidRow(
+          column(width = 12,
+                 leafletOutput(ns("institution_map"), height = 500) %>% withSpinner(color = "#76A8C1"))
+        )
+      )
+    ),
+    
+    fluidRow(
+      box(title = "How to interpret this plot",
+          collapsible = FALSE,
+          solidHeader = TRUE,
+          width = 12,
+          background = "primary",
+          p("This map shows the geographic distribution of first authors’ affiliated institutions. Location data is only available for articles with a DOI and
+          where the author's institutional information was available in OpenAlex. Click on a dot for more information, and use the arrows in the top right corner
+          to filter the data. Leave a filter empty to include everything. Sources include OpenAlex and the Research Organization Registry."))
+    ),
+    fluidRow(
+      box(
+        title = "Selected Studies",
+        status = "info",
+        solidHeader = TRUE,
+        width = 12,
+        tags$head(
+          tags$style(HTML("
+      .dataTables_wrapper .dataTable a {
+        color: #1A465F;
+        text-decoration: underline;
+      }
+    "))
+        ),
+        download_table_UI(ns("dl_location")),
+        DT::dataTableOutput(ns("location_table")) %>% withSpinner(color = "#96c296")
+      )
+    )
+  )
+}
+
+
+#' Location Map Server Module
+#'
+#' Server side of the location map: filters institution_tag, draws the markers and
+#' the table of studies, and handles downloads. Uses the same global data frames as
+#' location_map_UI().
+#'
+#' @param id A string representing the namespace ID for the module.
+#'
+#' @export
+location_map_Server <- function(id) {
+  moduleServer(
+    id,
+    function(input, output, session) {
+      
+      # Fill the large dropdowns server-side (the browser fetches matches as the user types)
+      updateSelectizeInput(session, "institution_select", server = TRUE,
+                           choices = location_choices("institution", institution_tag$name))
+      updateSelectizeInput(session, "intervention_loc_select", server = TRUE,
+                           choices = location_choices("intervention", interventions_df$name))
+      updateSelectizeInput(session, "outcome_loc_select", server = TRUE,
+                           choices = location_choices("outcome", outcome_df$name))
+      updateSelectizeInput(session, "model_loc_select", server = TRUE,
+                           choices = location_choices("model", model_df$name))
+      
+      scale_size <- function(num) {
+        scales::rescale(num, c(4, 25))  # Adjust size range as necessary
+      }
+      
+      type_palette <- colorFactor(palette = "Set3", domain = institution_tag$type)
+      
+      # Location - filtered data (one row per paper x institution) -----
+      # An empty filter means "include everything".
+      filtered_map_data <- reactive({
+        
+        d <- institution_tag
+        if (length(input$country_select))     d <- d[d$country   %in% input$country_select, ]
+        if (length(input$continent_select))   d <- d[d$continent %in% input$continent_select, ]
+        if (length(input$inst_type_select))   d <- d[d$type      %in% input$inst_type_select, ]
+        if (length(input$institution_select)) d <- d[d$name      %in% input$institution_select, ]
+        
+        pico_uids <- Filter(Negate(is.null), list(
+          location_uids_for(interventions_df, input$intervention_loc_select),
+          location_uids_for(outcome_df,       input$outcome_loc_select),
+          location_uids_for(model_df,         input$model_loc_select)))
+        
+        if (length(pico_uids)) d <- d[d$uid %in% Reduce(intersect, pico_uids), ]
+        
+        d
+      })
+      
+      # One marker per institution name, sized by the number of matching papers.
+      # Grouped by name only: some institutions have several ROR ids / coordinates under
+      # one name, and grouping by those too split them into overlapping markers with
+      # partial counts. The marker is placed at the first known coordinates.
+      map_points <- reactive({
+        filtered_map_data() %>%
+          group_by(name) %>%
+          summarise(type = first(type),
+                    lat = first(lat[!is.na(lat) & !is.na(long)]),
+                    long = first(long[!is.na(lat) & !is.na(long)]),
+                    number_pub = first(number_pub),
+                    filter_num_pubs = n_distinct(uid),
+                    .groups = "drop") %>%
+          filter(!is.na(lat), !is.na(long)) %>%
+          arrange(desc(filter_num_pubs))
+      })
+      
+      # Location - base map, drawn once -----
+      output$institution_map <- renderLeaflet({
+        leaflet() %>%
+          addProviderTiles(providers$Esri.WorldStreetMap) %>%
+          addLegend(
+            position = "bottomleft",
+            pal = type_palette,
+            values = sort(unique(institution_tag$type)),
+            title = "Institution Type",
+            opacity = 0.8
+          ) %>%
+          setView(lat = 0, lng = 0, zoom = 2)
+      })
+      
+      # Markers are only sent once the map exists in the browser (it is on a hidden tab
+      # until the user opens it, and updates sent before then would be lost)
+      map_ready <- reactiveVal(FALSE)
+      observeEvent(input$institution_map_zoom, map_ready(TRUE), once = TRUE)
+      
+      observe({
+        req(map_ready())
+        pts <- map_points()
+        
+        proxy <- leafletProxy("institution_map", data = pts) %>% clearMarkers()
+        if (nrow(pts) == 0) return()
+        
+        proxy %>%
+          addCircleMarkers(
+            ~long,
+            ~lat,
+            popup = ~paste0("<b>", name, "</b><br>",
+                            "Institution Type: ", type, "<br>",
+                            "No. of Publications: ", number_pub, "<br>",
+                            "Filtered No. of Publications: ", filter_num_pubs),
+            radius = ~scale_size(filter_num_pubs),
+            color = "black",
+            fillColor = ~type_palette(type),
+            fillOpacity = 1,
+            label = ~name,
+            weight = 1,
+            layerId = ~name
+          ) %>%
+          fitBounds(lng1 = min(pts$long) - 3,
+                    lat1 = min(pts$lat) - 3,
+                    lng2 = max(pts$long) + 3,
+                    lat2 = max(pts$lat) + 3)
+      })
+      
+      # Clicking a marker narrows the table to that institution; clicking the map resets it
+      filtered_table_data <- reactiveVal()
+      
+      observeEvent(input$institution_map_marker_click, {
+        click <- input$institution_map_marker_click
+        if (!is.null(click$id)) {
+          filtered_table_data(filtered_map_data() %>% filter(name == click$id))
+        }
+      })
+      
+      observeEvent(input$institution_map_click, {
+        filtered_table_data(NULL)
+      })
+      
+      # Location - table of studies (also used for downloads) -----
+      location_table <- reactive({
+        
+        base <- filtered_table_data()
+        if (is.null(base) || nrow(base) == 0) base <- filtered_map_data()
+        
+        validate(need(nrow(base) > 0,
+                      "No institutions match these filters. Try removing some of them."))
+        
+        # One row per paper and matching institution, taken from the filtered rows
+        # themselves. (Re-joining every institution for each paper listed co-authors'
+        # institutions too, including ones outside the filters, so the table didn't
+        # match the counts on the map.)
+        base %>%
+          distinct(uid, name, .keep_all = TRUE) %>%
+          left_join(pico, by = "uid") %>%
+          mutate(link = ifelse(!is.na(doi), paste0("https://doi.org/", doi), url),
+                 title = paste0("<a href='", link, "' target='_blank'>", title, "</a>"),
+                 name = paste0("<a href='", ror, "' target='_blank'>", name, "</a>")) %>%
+          select(uid, Institution = name, Title = title, Country = country,
+                 "Institution Type" = type, Intervention = intervention,
+                 Outcome = outcome, Model = model) %>%
+          distinct()
+      })
+      
+      output$location_table <- DT::renderDataTable({
+        
+        table_select <- location_table()
+        
+        DT::datatable(
+          table_select[, 2:ncol(table_select)],
+          rownames = FALSE,
+          escape = FALSE,
+          options = list(
+            language = list(
+              zeroRecords = "Click on a point to show data",
+              emptyTable = "Click on a point to show data"),
+            deferRender = FALSE,
+            scrollY = 600,
+            scrollX = 100,
+            scroller = TRUE,
+            columnDefs = list(
+              list(
+                targets = c(2, 3), #target for JS code
+                render = JS(
+                  "function(data, type, row, meta) {",
+                  "return type === 'display' && data.length > 100 ?",
+                  "'<span title=\"' + data + '\">' + data.substr(0, 100) + '...</span>' : data;",
+                  "}")),
+              list(
+                targets = c(2, 3), #target for JS code
+                render = JS(
+                  "function(data, type, row, meta) {",
+                  "return type === 'display' && data.length > 15 ?",
+                  "'<span title=\"' + data + '\">' + data.substr(0, 15) + '...</span>' : data;",
+                  "}")),
+              
+              list(width = '10%', targets = "_all")
+            )
+          )
+        )
+      })
+      
+      download_table_Server("dl_location", table = location_table,
+                            citations_for_dl = included_with_metadata)
     }
   )
 }

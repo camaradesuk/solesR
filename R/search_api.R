@@ -26,36 +26,36 @@
 scopus_search <- function(query = NULL, api_key = NULL, timespan = NULL, retMax = 5000, format_soles = TRUE) {
   # Check for query and exit if NULL
   if (is.null(query)) {
-    stop(message("Error: you have not entered a search query"))
+    stop("Error: you have not entered a search query")
   }
   
   # Check for API key and exit if NULL
   if (is.null(api_key)) {
-    stop(message("Error: you have not entered an API key"))
+    stop("Error: you have not entered an API key")
   }
   
   # Check if retMax is a positive integer and exit if not
   if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
-    stop(message("Error: retMax is not a whole number"))
+    stop("Error: retMax is not a whole number")
   }
   
   # Check retMax and exit if above maximum
   if (retMax > 5000) {
-    stop(message("Error: retMax is too high"))
+    stop("Error: retMax is too high")
   }
   
   # Check format_soles is boolean and exit if not
   if (is.logical(format_soles) == FALSE) {
-    stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
+    stop("Error: format_soles should be set to TRUE or FALSE, default is TRUE")
   }
   
   # Check for API key and exit if NULL
   if (is.null(timespan)) {
-    stop(message("Error: you have not entered a timespan for the search"))
+    stop("Error: you have not entered a timespan for the search")
   }
   
   if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
-    stop(message("Error: timespan format incorrect"))
+    stop("Error: timespan format incorrect")
   }
   
   # Define timespan for search
@@ -335,31 +335,31 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   
   # Check for query and exit if NULL
   if (is.null(query)) {
-    stop(message("Error: you have not entered a search query"))
+    stop("Error: you have not entered a search query")
   }
   
   # Check for API key and exit if NULL
   if (is.null(timespan)) {
-    stop(message("Error: you have not entered a timespan for the search"))
+    stop("Error: you have not entered a timespan for the search")
   }
   
   # Check format_soles is boolean and exit if not
   if (is.logical(format_soles) == FALSE) {
-    stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
+    stop("Error: format_soles should be set to TRUE or FALSE, default is TRUE")
   }
   
   # Check if retMax is a positive integer and exit if not
   if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
-    stop(message("Error: retMax is not a whole number"))
+    stop("Error: retMax is not a whole number")
   }
   
   # Check retMax and exit if above maximum
   if (retMax > 5000) {
-    stop(message("Error: retMax is too high"))
+    stop("Error: retMax is too high")
   }
   
   if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
-    stop(message("Error: timespan format incorrect"))
+    stop("Error: timespan format incorrect")
   }
   
   # Define timespan for search
@@ -424,7 +424,7 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
   try({
     if (pubmed_search@count < 1) {
       # Exit if no records found
-      stop(message("No records found"))
+      stop("No records found")
     } else if (inherits(pubmed_results, "Medline")) {
       # Return warning if result is a Medline object
       warning("Error: A Medline object is returned instead of a dataframe. For output compatible with the SOLES workflow, update the RISmed package from: https://github.com/kaitlynhair/RISmed")
@@ -482,31 +482,31 @@ pubmed_search <- function(query, timespan, retMax = 5000, format_soles = TRUE) {
 epmc_search <- function(query = NULL, timespan, retMax = 5000, format_soles = TRUE) {
   # Check for query and exit if NULL
   if (is.null(query)) {
-    stop(message("Error: you have not entered a search query"))
+    stop("Error: you have not entered a search query")
   }
   
   # Check for API key and exit if NULL
   if (is.null(timespan)) {
-    stop(message("Error: you have not entered a timespan for the search"))
+    stop("Error: you have not entered a timespan for the search")
   }
   
   # Check format_soles is boolean and exit if not
   if (is.logical(format_soles) == FALSE) {
-    stop(message("Error: format_soles should be set to TRUE or FALSE, default is TRUE"))
+    stop("Error: format_soles should be set to TRUE or FALSE, default is TRUE")
   }
   
   # Check if retMax is a positive integer and exit if not
   if (is.numeric(retMax) == FALSE | retMax %% 1 != 0 | retMax < 0) {
-    stop(message("Error: retMax is not a whole number"))
+    stop("Error: retMax is not a whole number")
   }
   
   # Check retMax and exit if above maximum
   if (retMax > 5000) {
-    stop(message("Error: retMax is too high"))
+    stop("Error: retMax is too high")
   }
   
   if (grepl("^(?i)\\d+(week|month)s?$", timespan) == FALSE) {
-    stop(message("Error: timespan format incorrect"))
+    stop("Error: timespan format incorrect")
   }
   
   # Define timespan for search
@@ -806,4 +806,214 @@ safe_col <- function(df, col, subcol = NULL, sub2col = NULL, default = NA_charac
   }
   
   value[[sub2col]]
+}
+
+
+# =============================================================================
+# Search helpers: run each database's searches, keep track of how far back
+# each database needs to search, and combine the results
+# =============================================================================
+
+# Where the search state (weeks to search back, per database) is saved, and
+# the state used when there is no saved file yet
+state_file <- "search/search_state.rds"
+default_state <- list(pubmed = 1, wos = 1, scopus = 1)
+
+#' Read the saved search state
+#'
+#' @description
+#' Reads how many weeks back each database should search. If there is no
+#' saved state yet, or the file can't be read, the default state is used
+#' (1 week for each database).
+#'
+#' @param path path to the saved state file (default "search/search_state.rds")
+#' @param default state to use if there is no readable saved state
+#' @return a named list of weeks per database, e.g. list(pubmed = 1, wos = 2, scopus = 1)
+#' @export
+#'
+get_state <- function(path = state_file, default = default_state) {
+  if (file.exists(path)) {
+    tryCatch(readRDS(path), error = function(e) default)
+  } else {
+    default
+  }
+}
+
+#' Save the search state
+#'
+#' @description
+#' Saves how many weeks back each database should search next time.
+#' Creates the folder if it doesn't exist yet.
+#'
+#' @param state a named list of weeks per database, as returned by get_state()
+#'   or run_database_search()$state
+#' @param path path to the state file (default "search/search_state.rds")
+#' @export
+#'
+save_state <- function(state, path = state_file) {
+  dir.create(dirname(path), showWarnings = FALSE, recursive = TRUE)
+  saveRDS(state, path)
+}
+
+#' Run one database's searches using its saved timespan
+#'
+#' @description
+#' Runs every query for one database, searching back the number of weeks saved
+#' in the state for that database.
+#'
+#' If ANY query errors, the whole database is treated as failed (even if other
+#' queries succeeded): no results are returned and the timespan is increased by
+#' one week, so the next run covers the missed period. The same happens if the
+#' searches succeed but return no results. On full success, the timespan is
+#' reset to 1 week.
+#'
+#' @param db_name name of the database in the state, e.g. "pubmed", "wos" or
+#'   "scopus". A database not in the state starts at 1 week.
+#' @param queries a character vector (or list) of queries for this database
+#' @param search_fn the search function, e.g. pubmed_search or wos_search
+#' @param state the current state, as returned by get_state()
+#' @param ... further arguments passed to search_fn, e.g. api_key for scopus_search
+#' @param override_weeks optional number of weeks to search instead of the
+#'   saved timespan (e.g. for a one-off catch-up search)
+#' @return a list with `result` (the combined, de-duplicated results, or NULL
+#'   if the database failed or found nothing) and `state` (the updated state;
+#'   save it with save_state())
+#' @examples
+#' \dontrun{
+#' state <- get_state()
+#' pm <- run_database_search("pubmed", pubmed_queries, pubmed_search, state)
+#' state <- pm$state
+#' save_state(state)
+#' }
+#' @export
+#'
+run_database_search <- function(db_name, queries, search_fn, state, ..., override_weeks = NULL) {
+  weeks <- if (!is.null(override_weeks)) {
+    override_weeks
+  } else if (!is.null(state[[db_name]])) {
+    state[[db_name]]
+  } else {
+    1   # database not in the saved state yet
+  }
+  timespan <- paste0(weeks, "week")
+  
+  results <- run_searches(queries, search_fn, timespan = timespan, ...)
+  
+  has_error <- any(vapply(results, inherits, logical(1), "try-error"))
+  
+  if (has_error) {
+    warning(db_name, " search had at least one failed query (timespan: ", timespan,
+            "). Next run will use ", weeks + 1, " weeks.", call. = FALSE)
+    state[[db_name]] <- weeks + 1
+    combined <- NULL
+  } else {
+    combined <- combine_results(results)
+    if (is.null(combined)) {
+      warning(db_name, " search returned no results (timespan: ", timespan,
+              "). Next run will use ", weeks + 1, " weeks.", call. = FALSE)
+      state[[db_name]] <- weeks + 1
+    } else {
+      state[[db_name]] <- 1
+    }
+  }
+  
+  list(result = combined, state = state)
+}
+
+#' Run each query through a search function
+#'
+#' @description
+#' Runs each query with search_fn, catching errors so one bad query doesn't
+#' stop the rest. Failed queries are returned as "try-error" objects.
+#'
+#' @param queries a character vector (or list) of queries
+#' @param search_fn the search function, e.g. pubmed_search
+#' @param ... further arguments passed to search_fn, e.g. timespan
+#' @return a list with one element per query: a data frame of results, or a
+#'   "try-error" object if that query failed
+#' @export
+#'
+run_searches <- function(queries, search_fn, ...) {
+  lapply(queries, function(q) try(search_fn(q, ...)))  # try() each query, extra args passed to search_fn
+}
+
+#' Combine the results of several queries
+#'
+#' @description
+#' Drops failed and empty results and combines the rest into one
+#' de-duplicated data frame.
+#'
+#' @param results_list a list of results, as returned by run_searches()
+#' @return a de-duplicated data frame, or NULL if no query returned any results
+#' @importFrom dplyr bind_rows distinct
+#' @export
+#'
+combine_results <- function(results_list) {
+  ok <- Filter(function(df) is.data.frame(df) && nrow(df) > 0, results_list)  # keep only real, non-empty results
+  if (length(ok) == 0) return(NULL)  # nothing usable
+  dplyr::bind_rows(ok) %>% dplyr::distinct()  # stack results, remove duplicate rows
+}
+
+#' Combine the results from each database into one data frame
+#'
+#' @description
+#' Combines per-database results (e.g. pubmed/wos/scopus) into one final data
+#' frame using combine_searches(). Takes object NAMES (as strings) rather than
+#' the objects themselves, so it can safely handle databases whose results were
+#' never assigned (e.g. due to an earlier error).
+#'
+#' @param names character vector of object names, e.g. c("pubmed", "wos", "scopus")
+#' @param envir environment to look for the objects in (default: where the
+#'   function is called from)
+#' @return a de-duplicated data frame, or NULL if none of the objects exist or
+#'   are data frames
+#' @export
+#'
+combine_existing_searches <- function(names, envir = parent.frame()) {
+  
+  # NULL for anything missing
+  dfs <- mget(names, envir = envir, ifnotfound = list(NULL))
+  # drop NULLs/non-data frames
+  dfs <- Filter(function(x) !is.null(x) && is.data.frame(x), dfs)
+  
+  # nothing to combine
+  if (length(dfs) == 0)
+    return(NULL)
+  
+  # merge remaining data frames, dedup
+  do.call(combine_searches, dfs) %>% dplyr::distinct()
+}
+
+#' Summarise a search result for reporting
+#'
+#' @description
+#' Returns the number of records found, or a short status if there is no
+#' usable result. Safe to call on objects that were never created.
+#'
+#' @param x a search result
+#' @param null_msg text to return if x doesn't exist or is NULL
+#' @return the number of rows if x is a data frame; otherwise null_msg,
+#'   "Error" (for a "try-error" object) or "Unknown"
+#' @export
+#'
+df_res_check <- function(x, null_msg = "Not available") {
+  x <- tryCatch(x, error = function(e) NULL)   # catches objects that were never created
+  if (is.null(x)) return(null_msg)
+  if (inherits(x, "try-error")) return("Error")
+  if (is.data.frame(x)) return(nrow(x))
+  "Unknown"
+}
+
+#' Summarise one database's search result for reporting
+#'
+#' @description
+#' As df_res_check(), but a missing result is reported as a failed search
+#' whose timespan has been increased for the next run.
+#'
+#' @param x a database's search result, e.g. run_database_search()$result
+#' @return the number of rows, or a status message
+#' @export
+#'
+db_res_check <- function(x) {
+  df_res_check(x, null_msg = "Search Failed - 1 week added to state.")
 }
