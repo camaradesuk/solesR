@@ -9,7 +9,8 @@ download_table_Server(id, table, citations_for_dl)
 \arguments{
 \item{id}{The module identifier.}
 
-\item{table}{The filtered table which the user wishes to download}
+\item{table}{A reactive returning the filtered table the user wishes to download
+(it must have a \code{uid} column). A plain data frame is also accepted.}
 
 \item{citations_for_dl}{All of the included studies and metadata}
 }

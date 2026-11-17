@@ -577,10 +577,7 @@ format_tiab <- function(df) {
 #' @param folder Folder containing the XML files, e.g. `"full_texts"`.
 #' @return Invisibly, the paths of the text files created.
 #' @seealso [add_txt_files()] to add the new text files to the `full_texts` table.
-#' @importFrom xml2 read_xml xml_children xml_name xml_text xml_find_all
-#'   xml_find_first xml_remove
-#' @importFrom purrr map2_lgl
-#' @importFrom stringr str_squish str_trim str_detect str_remove
+#' @importFrom xml2 read_xml xml_children xml_name xml_text xml_find_all xml_find_first xml_remove
 #' @export
 convert_xmls_to_txt <- function(folder) {
   

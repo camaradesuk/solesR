@@ -4,17 +4,83 @@
 \alias{rob_tag}
 \title{Tag studies by risk of bias}
 \usage{
-rob_tag(con, max_file_size = 5e+05, num_cores = 10, py_path = "")
+rob_tag(
+  con,
+  max_file_size = 5e+05,
+  num_cores = 10,
+  py_path = "",
+  venv = NULL,
+  batch_size = 350,
+  threads_per_job = 1,
+  dois = NULL,
+  output_csv = NULL,
+  n_retag = NULL,
+  seed = NULL,
+  max_threads = NULL
+)
 }
 \arguments{
 \item{con}{connection to db}
 
-\item{max_file_size}{maximum file size in bites}
+\item{max_file_size}{maximum file size in bytes}
 
-\item{num_cores}{number of cores to use for parallelisation}
+\item{num_cores}{maximum number of python jobs to run at once (each job
+loads all the models, so this also limits memory use)}
 
-\item{py_path}{path to python risk of bias tool e.g. "/opt/sharedFolder/rob/rob-app/"}
+\item{py_path}{path to the risk of bias python script,
+e.g. "/opt/sharedFolder/rob/rob-app/rob_211026.py"
+(a folder containing rob.py also works)}
+
+\item{venv}{python virtual environment to run the script in. Defaults to
+the folder the script is in, e.g. "/opt/sharedFolder/rob/rob-app/"}
+
+\item{batch_size}{maximum number of citations to tag per call}
+
+\item{threads_per_job}{CPU threads each python job may use (default 1), so
+the run uses num_cores * threads_per_job CPU cores in total. Capping
+threads changes probabilities around the 6th decimal place compared with
+the original (labels are unaffected). NULL leaves threads to PyTorch, as
+the original did: identical probabilities, but each job then tries to use
+every core on the machine.}
+
+\item{dois}{optional character vector of DOIs to (re-)tag, e.g. df$doi.
+These are tagged whether or not they are already in rob_tag, batch_size
+is ignored, and results are written to output_csv, never to the database.}
+
+\item{output_csv}{optional file path. If given, results are written to this
+CSV instead of the database. When dois is used and output_csv is not
+given, a timestamped file "rob_retag_YYYYMMDD_HHMMSS.csv" is written to
+the working directory.}
+
+\item{n_retag}{optional number of papers to re-tag, picked at random from
+\code{dois}, or from all papers already in rob_tag if \code{dois} is not given.
+Only papers that can be tagged (full text found, within max_file_size)
+are sampled, so you get n_retag results if that many are available.}
+
+\item{seed}{random seed for the n_retag sample, so the same papers can be
+picked again. NULL gives a different sample each time.}
+
+\item{max_threads}{optional total number of CPU threads the app may use,
+e.g. 24 on a 48-core server. The function picks the number of jobs (up to
+num_cores) that uses as much of the budget as possible, preferring more
+jobs, and gives every job the same number of threads,
+e.g. max_threads = 24, num_cores = 10 gives 8 jobs x 3 threads. Overrides
+threads_per_job. Scores can differ around the 6th decimal place between
+runs that end up with a different number of threads per job.}
+}
+\value{
+the tagged citations, invisibly
 }
 \description{
-Tag studies by risk of bias
+Changes from the original are marked with "CHANGE:" comments. In summary:
+\itemize{
+\item Python runs with a thread limit, so the jobs don't overload the server
+(max_threads / threads_per_job).
+\item Papers can be re-tagged (dois / n_retag / seed) with results written to
+a CSV instead of the database (output_csv).
+\item Each paper's file path is checked directly, and skipped papers are
+reported with the reason.
+\item Failures are reported instead of passing silently.
+\item Temporary files go in a private folder that is always cleaned up.
+}
 }

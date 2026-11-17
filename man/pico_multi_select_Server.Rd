@@ -4,7 +4,15 @@
 \alias{pico_multi_select_Server}
 \title{Multi-Select Bar Chart for PICO Tabs}
 \usage{
-pico_multi_select_Server(id, multi_select = TRUE, table, column, column2, text)
+pico_multi_select_Server(
+  id,
+  multi_select = TRUE,
+  table,
+  column,
+  column2,
+  text,
+  selected = NULL
+)
 }
 \arguments{
 \item{id}{The module identifier.}
@@ -18,6 +26,8 @@ pico_multi_select_Server(id, multi_select = TRUE, table, column, column2, text)
 \item{column2}{The name of the second column (if multi-select is TRUE and 2 dropdown menus are required).}
 
 \item{text}{The text to display below the chart stating the origin of the data.}
+
+\item{selected}{(single-select only) The default selection; must match \code{selected} in the UI.}
 }
 \description{
 This is the server function for the PICO multi-select module. It generates a bar chart by year based on the inputs.
