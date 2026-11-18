@@ -254,7 +254,7 @@ run_ml <- function(con, training_set, unscreened_set, project_name, classifier_n
 #'    - Runs the specified machine learning classifier via an external API.
 #'    - Computes and saves performance metrics and test scores.
 #' 
-#' Results are saved in a directory named `k-fold-validation` in the current working directory.
+#' Results are saved in a directory named `screening/k-fold-validation` in the current working directory.
 #'
 #' @import dplyr tidyr readr janitor rsample caTools
 #' @examples
@@ -271,7 +271,7 @@ run_ml <- function(con, training_set, unscreened_set, project_name, classifier_n
 #' )
 #' }
 #' @return
-#' The function does not return an R object. It writes the results to the `k-fold-validation` directory.
+#' The function does not return an R object. It writes the results to the `screening/k-fold-validation` directory.
 #' 
 #' @export
 #'
@@ -286,13 +286,12 @@ run_k_fold <- function(con,
                        classifier_name = NULL) {
   
   # Create folders for saving data
-  data_folder <- "k-fold-validation/"
-  data_output <- "k-fold-validation/output/"
-  data_results <- "k-fold-validation/results/"
+  data_folder  <- "screening/k-fold-validation/"
+  data_output  <- file.path(data_folder, "output/")
+  data_results <- file.path(data_folder, "results/")
   
-  dir.create(data_folder, showWarnings = FALSE)
-  dir.create(data_output, showWarnings = FALSE)
-  dir.create(data_results, showWarnings = FALSE)
+  dir.create(data_output,  recursive = TRUE, showWarnings = FALSE)
+  dir.create(data_results, recursive = TRUE, showWarnings = FALSE)
   
   # Wrappers and config for EPPI ML algorithm
   source("/opt/sharedFolder/SSML/create_files_API.R")
@@ -496,43 +495,6 @@ run_k_fold <- function(con,
   
   try(file.remove(file_paths[file.exists(file_paths)]))
   
-  
-  # Function to calculate performance at the threshold that gives ≥ 0.95 recall
-  evaluate_fold <- function(df) {
-    thresholds <- seq(0, 1, by = 0.01)
-    
-    perf_df <- purrr::map_dfr(thresholds, function(thresh) {
-      
-      df_thresh <- df %>%
-        mutate(pred = ifelse(score >= thresh, 1, 0))
-      
-      TP <- sum(df_thresh$pred == 1 & df_thresh$decision == 1)
-      TN <- sum(df_thresh$pred == 0 & df_thresh$decision == 0)
-      FP <- sum(df_thresh$pred == 1 & df_thresh$decision == 0)
-      FN <- sum(df_thresh$pred == 0 & df_thresh$decision == 1)
-      
-      recall <- TP / (TP + FN)
-      specificity <- TN / (TN + FP)
-      precision <- TP / (TP + FP + 1e-10)
-      
-      f1 <- 2 * (precision * recall) / (precision + recall + 1e-10)
-      f2 <- 5 * (precision * recall) / (4 * precision + recall + 1e-10)
-      
-      tibble(threshold = thresh, recall, specificity, precision, f1, f2)
-    })
-    
-    # Keep only rows with recall >= 0.95
-    valid <- perf_df %>% filter(recall >= 0.95)
-    
-    # Skip if no valid threshold found
-    if (nrow(valid) == 0) return(NULL)  
-    
-    # Use the threshold that achieves the recall goal
-    best <- valid %>% slice_max(threshold)
-    
-    return(best)
-  }
-  
   # Apply function to each fold & repeat. Giving the performance metrics and threshold when recall >= 0.95
   performance_results <- ml_results %>%
     group_by(n_repeat, fold) %>%
@@ -548,19 +510,98 @@ run_k_fold <- function(con,
       mean_threshold = mean(threshold, na.rm = TRUE),
       median_threshold = median(threshold, na.rm = TRUE),
       global_threshold = evaluate_fold(ml_results) %>% pull(threshold),
-      mean_recall = round(mean(recall, na.rm = TRUE),3),
-      sd_recall = round(sd(recall, na.rm = TRUE),3),
-      mean_specificity = round(mean(specificity, na.rm = TRUE),3),
-      sd_specificity = round(sd(specificity, na.rm = TRUE),3),
-      mean_f1 = round(mean(f1, na.rm = TRUE),3),
-      sd_f1 = round(sd(f1, na.rm = TRUE),3),
-      mean_f2 = round(mean(f2, na.rm = TRUE),3),
-      sd_f2 = round(sd(f2, na.rm = TRUE),3)
+      mean_recall = round(mean(recall, na.rm = TRUE),4),
+      sd_recall = round(sd(recall, na.rm = TRUE),4),
+      mean_specificity = round(mean(specificity, na.rm = TRUE),4),
+      sd_specificity = round(sd(specificity, na.rm = TRUE),4),
+      mean_f1 = round(mean(f1, na.rm = TRUE),4),
+      sd_f1 = round(sd(f1, na.rm = TRUE),4),
+      mean_f2 = round(mean(f2, na.rm = TRUE),4),
+      sd_f2 = round(sd(f2, na.rm = TRUE),4)
     )
   
   write.csv(summary_stats, paste0(data_results, "summary_results_", date, file_id, ".csv"), row.names = F)
   
 }
+
+evaluate_fold <- function(df, score_col = "score", decimals = 4) {
+  
+  
+  # Pull the score vector out of df using the column name provided
+  score <- df[[score_col]]
+  
+  # Threshold grid resolution, e.g. decimals = 4 -> step = 0.0001
+  # (matches the granularity of the original brute-force version, but
+  # computed without looping over the data at every threshold)
+  step <- 10^(-decimals)
+  thresholds <- seq(0, 1, by = step)
+  
+  # --- Sort scores once, ascending ---
+  # Once sorted, "how many scores fall below threshold X" becomes a simple
+  # lookup via findInterval() instead of a fresh full-table scan per threshold.
+  # This is the key trick that makes this O(n log n) instead of O(n * thresholds).
+  ord    <- order(score)
+  scores <- score[ord]
+  labels <- df$decision[ord]   # reorder labels to match the sorted scores
+  
+  # Total counts of each class, needed to derive TP/FP from FN/TN below
+  total_pos <- sum(labels == 1)
+  total_neg <- sum(labels == 0)
+  
+  # Running (cumulative) counts of positives/negatives as we walk up the
+  # sorted score list. cum_pos[i] = number of positive labels among the
+  # i lowest-scoring rows. This lets us answer "how many positives/negatives
+  # have a score below some cutoff" in O(1) per threshold via indexing.
+  cum_pos <- cumsum(labels == 1)
+  cum_neg <- cumsum(labels == 0)
+  
+  # For each threshold, find how many sorted scores are strictly less than it.
+  # left.open = TRUE means we count scores < threshold (not <=), which
+  # matches "pred = 1 if score >= threshold" -> everything below is pred = 0.
+  # n_below is effectively the index into cum_pos/cum_neg for "count of
+  # positives/negatives predicted negative at this threshold".
+  n_below <- findInterval(thresholds, scores, left.open = TRUE)
+  
+  # FN = positives incorrectly predicted negative (score < threshold)
+  # TN = negatives correctly predicted negative (score < threshold)
+  # Guard against n_below == 0 (threshold below all scores -> no one predicted
+  # negative yet), since cum_pos[0]/cum_neg[0] would be an invalid index.
+  FN <- ifelse(n_below > 0, cum_pos[pmax(n_below, 1)], 0)
+  TN <- ifelse(n_below > 0, cum_neg[pmax(n_below, 1)], 0)
+  
+  # TP/FP are just what's left over once FN/TN are known
+  TP <- total_pos - FN
+  FP <- total_neg - TN
+  
+  perf_df <- tibble::tibble(
+    threshold   = thresholds,
+    recall      = TP / (TP + FN),               # a.k.a. sensitivity / TPR
+    specificity = TN / (TN + FP),                # a.k.a. TNR
+    # +1e-10 avoids 0/0 = NaN when a threshold predicts nothing positive
+    # (TP + FP == 0), at the cost of a negligible (~1e-10) numerical bias
+    precision   = TP / (TP + FP + 1e-10),
+  ) %>%
+    dplyr::mutate(
+      # Same epsilon trick applied to the harmonic-mean-based F-scores,
+      # so they stay finite even when precision + recall would otherwise be 0
+      f1 = 2 * (precision * recall) / (precision + recall + 1e-10),
+      # F2 weights recall 4x more heavily than precision (beta = 2)
+      f2 = 5 * (precision * recall) / (4 * precision + recall + 1e-10)
+    )
+  
+  # We want the strictest (highest) threshold that still hits our recall
+  # target, so first narrow down to thresholds meeting the recall floor
+  valid <- perf_df %>% dplyr::filter(recall >= 0.95)
+  
+  # No threshold achieved the recall target for this fold -> caller should
+  # handle NULL (e.g. skip this fold / score column)
+  if (nrow(valid) == 0) return(NULL)
+  
+  # Among valid thresholds, pick the highest one (maximizes precision/
+  # specificity while still satisfying recall >= 0.95)
+  valid %>% dplyr::slice_max(threshold)
+}
+
 
 #' Run ML using the training and validation sets from K-fold
 #'
@@ -580,11 +621,10 @@ run_k_fold <- function(con,
 run_ml_kfold_val <- function(con, training_set, validation_set, project_name, file_id = ""){
   
   # Create directories
-  data_folder <- "k-fold-validation/"
-  data_output <- "k-fold-validation/output/"
+  data_folder <- "screening/k-fold-validation/"
+  data_output <- file.path(data_folder, "output/")
   
-  dir.create(data_folder, showWarnings = F)
-  dir.create(data_output, showWarnings = F)
+  dir.create(data_output, recursive = TRUE, showWarnings = FALSE)
   
   # Wrappers and config for EPPI ML algorithm
   source("/opt/sharedFolder/SSML/create_files_API.R")
@@ -618,99 +658,127 @@ run_ml_kfold_val <- function(con, training_set, validation_set, project_name, fi
 #' This function calculates a variety of performance metrics (e.g., sensitivity, specificity, F1-score, etc.)
 #' for a binary classifier across a range of thresholds. It merges predicted scores with ground truth labels,
 #' computes metrics for predefined thresholds (mean, median, global), and also performs a full sweep across
-#' thresholds from 0 to 1 by increments of 0.01. The results are saved to a CSV file and returned as a data frame.
+#' thresholds. The sweep is calculated at fine (4dp) resolution internally, but only 2dp thresholds are
+#' kept in the returned/written full sweep to keep the output compact. Results are optionally saved to a
+#' CSV file and returned as a data frame.
 #'
-#' @param validation_set_scores A data frame containing the model's predicted probabilities. 
+#' @param validation_set_scores A data frame containing the model's predicted probabilities.
 #' @param validation_set_labels A data frame containing the human screening labels.
 #' @param summary_results A named list or data frame containing predefined thresholds to evaluate.
 #' @param file_id Optional string identifier to append to the output CSV filename. Defaults to an empty string.
+#' @param download_res_csv Logical; if TRUE, writes the results to a CSV file.
+#' @param calc_decimals Resolution of the internal threshold sweep (default 4, i.e. step = 0.0001).
+#' @param output_decimals Resolution of thresholds kept in the returned/written full sweep (default 2,
+#'   i.e. step = 0.01). Must be <= calc_decimals.
 #'
 #' @return A data frame containing threshold performance metrics for each threshold tested.
-#' Results are also written to a CSV file in the \code{k-fold-validation/results/} directory.
+#' Results are also optionally written to a CSV file in the \code{screening/k-fold-validation/results/} directory.
 #'
 #' Output is saved to a CSV named \code{threshold_performance_<date><file_id>.csv}.
 #'
 #' @export
-evaluate_model_performance <- function(validation_set_scores, validation_set_labels, summary_results, file_id = "") {
+evaluate_model_performance <- function(validation_set_scores, validation_set_labels, summary_results,
+                                       file_id = "", download_res_csv = TRUE,
+                                       calc_decimals = 4, output_decimals = 2) {
   
-  # Create folders
-  data_folder <- "k-fold-validation/"
-  data_output <- "k-fold-validation/output/"
-  data_results <- "k-fold-validation/results/"
+  # Folder for results
+  data_results <- "screening/k-fold-validation/results/"
   
   date <- format(Sys.Date(), "%d%m%y")
   
   # Merge and prepare the main dataframe
   df <- validation_set_scores %>%
-    left_join(validation_set_labels, by = c("PaperId" = "TEMP_ID")) %>% 
+    left_join(validation_set_labels, by = c("PaperId" = "TEMP_ID")) %>%
     rename(score = probabilities, label = LABEL)
   
   # Smoothing via a small epsilon is used to avoid division-by-zero errors during metric computation.
   eps <- 1e-10
   
-  # Define function to calculate metrics for a given threshold
-  calc_metrics <- function(threshold) {
-    df$prediction <- ifelse(df$score >= threshold, 1, 0)
+  # --- Vectorized metric calculation for a vector of thresholds at once ---
+  # Sorts scores once, then uses cumulative sums + findInterval to get TP/TN/FP/FN
+  # for every threshold in a single pass, instead of rescanning the full dataframe
+  # per threshold.
+  calc_metrics_vec <- function(thresholds, scores, labels) {
     
-    TP <- sum(df$prediction == 1 & df$label == 1)
-    TN <- sum(df$prediction == 0 & df$label == 0)
-    FP <- sum(df$prediction == 1 & df$label == 0)
-    FN <- sum(df$prediction == 0 & df$label == 1)
+    ord           <- order(scores)
+    scores_sorted <- scores[ord]
+    labels_sorted <- labels[ord]
+    
+    total_pos <- sum(labels_sorted == 1)
+    total_neg <- sum(labels_sorted == 0)
+    n_total   <- length(labels_sorted)
+    
+    cum_pos <- cumsum(labels_sorted == 1)
+    cum_neg <- cumsum(labels_sorted == 0)
+    
+    # Count how many sorted scores fall strictly below each threshold
+    # (predicted negative, since prediction = 1 when score >= threshold)
+    n_below <- findInterval(thresholds, scores_sorted, left.open = TRUE)
+    
+    FN <- ifelse(n_below > 0, cum_pos[pmax(n_below, 1)], 0)
+    TN <- ifelse(n_below > 0, cum_neg[pmax(n_below, 1)], 0)
+    TP <- total_pos - FN
+    FP <- total_neg - TN
     
     sensitivity <- TP / (TP + FN + eps)
     specificity <- TN / (TN + FP + eps)
-    accuracy <- (TP + TN) / (TP + TN + FP + FN + eps)
-    precision <- TP / (TP + FP + eps)
-    f1_score <- 2 * (precision * sensitivity) / (precision + sensitivity + eps)
-    f2_score <- (5 * (precision * sensitivity)) / ((4 * precision) + sensitivity + eps)
+    accuracy    <- (TP + TN) / (n_total + eps)
+    precision   <- TP / (TP + FP + eps)
+    f1_score    <- 2 * (precision * sensitivity) / (precision + sensitivity + eps)
+    f2_score    <- (5 * (precision * sensitivity)) / ((4 * precision) + sensitivity + eps)
     
-    return(data.frame(
-      threshold = threshold,
+    data.frame(
+      threshold   = thresholds,
       sensitivity = round(sensitivity, 3),
       specificity = round(specificity, 3),
-      accuracy = round(accuracy, 3),
-      precision = round(precision, 3),
-      f1_score = round(f1_score, 3),
-      f2_score = round(f2_score, 3)
-    ))
+      accuracy    = round(accuracy, 3),
+      precision   = round(precision, 3),
+      f1_score    = round(f1_score, 3),
+      f2_score    = round(f2_score, 3)
+    )
   }
   
-  # Calculate metrics for custom thresholds (mean, median, global)
+  scores <- df$score
+  labels <- df$label
+  
+  # --- Custom thresholds (mean, median, global) ---
+  # These are exact values (not on any particular grid), so evaluated as-is
   custom_thresholds <- c(
-    mean_threshold = summary_results$mean_threshold,
+    mean_threshold   = summary_results$mean_threshold,
     median_threshold = summary_results$median_threshold,
     global_threshold = summary_results$global_threshold
   )
   
-  # Compute metrics for each custom threshold
-  custom_results <- lapply(names(custom_thresholds), function(name) {
-    metrics <- calc_metrics(custom_thresholds[[name]])
-    metrics$threshold_type <- name
-    return(metrics)
-  }) %>%
-    bind_rows() %>%
-    select(threshold_type, everything())
+  custom_results <- calc_metrics_vec(unname(custom_thresholds), scores, labels)
+  custom_results$threshold_type <- names(custom_thresholds)
+  custom_results <- custom_results %>% select(threshold_type, everything())
   
-  # Calculate metrics for full threshold sweep (0 to 1 by 0.01)
-  all_thresholds <- seq(0, 1, by = 0.01)
+  # --- Full threshold sweep, calculated at fine (calc_decimals) resolution ---
+  calc_step <- 10^(-calc_decimals)
+  calc_thresholds <- seq(0, 1, by = calc_step)
   
-  # Compute metrics for each threshold in the sweep
-  full_results <- lapply(all_thresholds, function(thresh) {
-    metrics <- calc_metrics(thresh)
-    metrics$threshold <- thresh
-    metrics$threshold_type <- "all"
-    return(metrics)
-  }) %>%
-    bind_rows() %>%
+  full_results_fine <- calc_metrics_vec(calc_thresholds, scores, labels)
+  full_results_fine$threshold_type <- "all"
+  
+  # --- Thin down to output_decimals resolution before writing/returning ---
+  # Keep only the rows whose threshold lands on the coarser output grid
+  # (e.g. calc at 4dp, but only keep the 2dp values: 0.00, 0.01, 0.02, ...)
+  out_step <- 10^(-output_decimals)
+  full_results <- full_results_fine %>%
+    filter(abs(threshold / out_step - round(threshold / out_step)) < 1e-8) %>%
+    mutate(threshold = round(threshold, output_decimals)) %>%
     select(threshold_type, threshold, everything())
   
   # Combine for plotting or comparison ---
   combined_results <- bind_rows(custom_results, full_results)
   
-  write.csv(combined_results, paste0(data_results, "threshold_performance_", date, file_id, ".csv"))
-  
+  if (download_res_csv) {
+    dir.create(data_results, recursive = TRUE, showWarnings = FALSE)
+    write.csv(combined_results, paste0(data_results, "threshold_performance_", date, file_id, ".csv"))
+  }
   return(combined_results)
 }
+
 
 #' Identify Studies for Error Correction Review
 #'
@@ -1033,30 +1101,34 @@ run_error_correction <- function(con,
 
 #' Run machine learning screening at a fixed threshold
 #'
-#' Trains an ML classifier on labelled screening data and scores unlabeled studies. Applies a
-#' probability threshold to generate include/exclude decisions, and writes the
-#' results to the `study_classification` database table.
+#' Trains the classifier on the k-fold training set and scores the validation and
+#' unscreened studies, using the median k-fold threshold to include or exclude.
+#' Writes the unscreened studies' decisions to `study_classification` and the
+#' validation performance to `ml_performance`.
 #'
-#' @param con A DBI database connection used to write classification results.
-#' @param project_name Character string giving the ML project name.
-#' @param classifier_name Character string identifying the classifier.
-#' @param screening_decisions Data frame of previously screened (labelled) records.
-#' @param unscreened_set Data frame of unscreened (unlabelled) records.
-#' @param threshold Numeric value between 0 and 1 used to classify records as
-#'   "include" or "exclude".
-#'
-#' @return Invisibly returns `NULL`. Results are written to disk and the database.
-#' 
-#' @import DBI
-#' @import dplyr
-#' @import readr
+#' @param con A DBI database connection.
+#' @param project_name ML project name.
+#' @param classifier_name Classifier name, e.g. "in-vivo".
+#' @param training_set Training set from `run_k_fold()`.
+#' @param validation_set Validation set from `run_k_fold()`.
+#' @param unscreened_set Unscreened studies from `get_studies_to_screen()`.
+#' @param summary_results Summary results from `run_k_fold()`; `median_threshold` is used.
+#' @param file_id Optional string passed to `evaluate_model_performance()`.
+#' @return Called for its side effects.
+#' @import DBI dplyr readr
+#' @importFrom stringr str_squish str_replace_all
 #' @export
 run_ml_at_threshold <- function(con, 
                                 project_name = "", 
                                 classifier_name = "in-vivo", 
-                                screening_decisions, 
+                                training_set,
+                                validation_set,
                                 unscreened_set, 
-                                threshold){
+                                summary_results,
+                                file_id = ""){
+  
+  # Threshold used to classify records as include/exclude
+  threshold <- summary_results$median_threshold
   
   # Create directories
   dir.create("screening", showWarnings = F)
@@ -1071,9 +1143,21 @@ run_ml_at_threshold <- function(con,
   # Set date
   date <- format(Sys.Date(), "%y%m%d")
   
-  # Merge labelled and unlabelled data
-  ml_data <- rbind(screening_decisions, unscreened_set) %>%
+  ml_data <- validation_set %>% 
+    mutate(LABEL = 99) %>% 
+    rbind(training_set) %>% 
+    select(-TEMP_ID) %>% 
+    rbind(unscreened_set) %>% 
     mutate(TEMP_ID = row_number())
+  
+  validation_TEMP_IDs <- ml_data %>% 
+    filter(ITEM_ID %in% validation_set$ITEM_ID) %>% 
+    pull(TEMP_ID)
+  
+  # Strip line breaks/tabs from text so records don't split across rows in the TSV
+  ml_data <- ml_data %>%
+    mutate(across(where(is.character),
+                  ~ stringr::str_squish(str_replace_all(.x, "[\r\n\t]+", " "))))
   
   # Write unscreened data to tsv
   write_tsv(ml_data, paste0("screening/output/ml_run_",date,".tsv"))
@@ -1087,19 +1171,57 @@ run_ml_at_threshold <- function(con,
   # Send data to ML via API and return results to output folder
   TrainCollection(ml_filenames, projectId = paste0(project_name, "_run_ml_",date))
   
+  # Read in results
+  ml_scores <- read_tsv(paste0("screening/output/ml_run_",date,"_results.tsv"))
+  
+  # Gather latest CID  
+  latest_CID <- tbl(con, "study_classification") %>% 
+    select(cid) %>% 
+    collect() %>% 
+    pull(cid) %>% 
+    max() + 1
+  
   # Read in scores and process those above threshold
-  ml_scores <- read_tsv(paste0("screening/output/ml_run_",date,"_results.tsv")) %>%
+  new_ml_scores <- ml_scores %>%
     select(-Incl, TEMP_ID = PaperId) %>%
+    filter(!TEMP_ID %in% validation_TEMP_IDs) %>% 
     left_join(ml_data, by = "TEMP_ID") %>%
     select(uid = ITEM_ID, score = probabilities) %>%
     mutate(decision = ifelse(score >= threshold, "include", "exclude")) %>%
     mutate(type = "eppi-machine",
            name = classifier_name,
-           cid = date,
+           cid = latest_CID,
            date = Sys.Date())
   
   # Write data to table
-  dbWriteTable(con, "study_classification", ml_scores, append = T)
+  dbWriteTable(con, "study_classification", new_ml_scores, append = T)
+  
+  validation_scores <- ml_scores %>% 
+    filter(PaperId %in% validation_TEMP_IDs) 
+  
+  validation_labels <- validation_set %>%
+    select(ITEM_ID, LABEL) %>% 
+    left_join(ml_data %>% select(ITEM_ID, TEMP_ID), by ="ITEM_ID")
+  
+  
+  # Calculate validation set performance
+  performance_metrics <- evaluate_model_performance(validation_set_scores = validation_scores, 
+                                                    validation_set_labels = validation_labels, 
+                                                    summary_results = summary_results, 
+                                                    file_id = file_id, download_res_csv = FALSE)
+  
+  # Format data for ml_performance table
+  latest_performance <- performance_metrics %>%
+    filter(threshold_type == "median_threshold") %>% 
+    mutate(
+      balanced_accuracy = (sensitivity + specificity) / 2,
+      utility = (5/6) * sensitivity + (1/6) * specificity,
+      cid = latest_CID
+    ) %>% 
+    select(threshold, utility, specificity, sensitivity, precision, f1 = f1_score, balanced_accuracy, cid)
+  
+  
+  dbWriteTable(con, "ml_performance", latest_performance, append = T)
   
   
 }
